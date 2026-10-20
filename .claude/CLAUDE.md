@@ -30,6 +30,10 @@ Diseño, con el proyecto NestJS inicializado (sin lógica de dominio). Las decis
 - NestJS 12, TypeScript, Node 22 (`.nvmrc`), yarn 4 con `nodeLinker: node-modules` (el CLI genera PnP por defecto; se descartó por fricción con Docker e IDE).
 - Arquitectura de microservicios, Docker, despliegue tentativo en ECS con Fargate.
 - Seguir las prácticas estándar de NestJS (módulos, DI, DTOs con validación, config, tests).
+- Este servicio se desarrolla como repo independiente. Más adelante, al agregar la IaC, se evaluará un monorepo que lo integre.
+- Estructura: `src/modules/<subdominio>/` con un módulo Nest por subdominio, cada uno en su carpeta; código transversal en `src/shared/`. Imports ESM con extensión `.js`.
+- Base de datos: PostgreSQL en Docker para local (`docker-compose.yml`, variables en `.env.example`).
+- LocalStack para simular AWS en local (SQS, SNS, Secrets Manager, etc. según el diseño). Especificado, aún no configurado.
 - Tooling que trae el scaffold: vitest (unit y e2e), oxlint, prettier.
 
 ## Commands
