@@ -1,4 +1,4 @@
-# lending-service
+# acme-credit-backend
 
 Servicio de lending para Acme Credit (tarjeta de crédito asegurada con colateral). Reto técnico con entrega en 5 días. Especificación completa en @.claude/context/spec.md.
 
