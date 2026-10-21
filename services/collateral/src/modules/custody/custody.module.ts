@@ -13,9 +13,10 @@ import {
   OutboxService,
   type SqlDb,
 } from '@acme/nest-common';
-import { BankAdapter } from '../../clients/banks/bank-adapter.js';
-import { BankRegistry } from '../../clients/banks/bank-registry.js';
-import { SimulatedBankAdapter } from '../../clients/banks/simulated-bank.adapter.js';
+import {
+  BankRegistry,
+  bankRegistryFromEnv,
+} from '../../clients/banks/bank-registry.js';
 import {
   CollateralTermsProvider,
   StaticCollateralTermsProvider,
@@ -44,22 +45,7 @@ import { InternalCustodyController } from './internal-custody.controller.js';
           ratioBps: Number(process.env.COLLATERAL_RATIO_BPS ?? 9000),
         }),
     },
-    {
-      provide: BankAdapter,
-      useFactory: () =>
-        new SimulatedBankAdapter({
-          bankId: 'sim-bank',
-          publicKeyPem: (process.env.BANK_SIM_PUBLIC_KEY ?? '').replace(
-            /\\n/g,
-            '\n',
-          ),
-        }),
-    },
-    {
-      provide: BankRegistry,
-      useFactory: (adapter: BankAdapter) => new BankRegistry([adapter]),
-      inject: [BankAdapter],
-    },
+    { provide: BankRegistry, useFactory: () => bankRegistryFromEnv() },
     {
       provide: EventPublisher,
       useFactory: () =>

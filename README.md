@@ -188,7 +188,7 @@ The design was driven by me and implemented with Claude Code: I decided the arch
 ## Trade-offs and what is not done
 
 - Installments (deferred purchases) are designed ([`docs/decisions.md`](docs/decisions.md)) but not implemented.
-- Banks are simulated; only the asymmetric signature scheme exists. The identity provider and the service-token issuer are assumed, not built.
+- Banks are simulated (one Ed25519 and one HMAC adapter). The identity provider and the service-token issuer are assumed, not built.
 - The terms service is a static adapter.
 - Interest dates use UTC; time zones per product are not modelled.
 - A purchase that was already paid cannot be reversed (there are no credit balances or refunds).

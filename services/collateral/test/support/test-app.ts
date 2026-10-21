@@ -1,4 +1,9 @@
-import { createPrivateKey, generateKeyPairSync, sign } from 'node:crypto';
+import {
+  createHmac,
+  createPrivateKey,
+  generateKeyPairSync,
+  sign,
+} from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { importPKCS8, SignJWT } from 'jose';
@@ -23,6 +28,7 @@ process.env.AUTH_ISSUER = issuer;
 process.env.AUTH_AUDIENCE = audience;
 process.env.AUTH_PUBLIC_KEY = pem(authKeys.publicKey, 'spki');
 process.env.BANK_SIM_PUBLIC_KEY = pem(bankKeys.publicKey, 'spki');
+process.env.BANK_HMAC_SECRET = 'hmac-test-secret-0123456789';
 process.env.COLLATERAL_RATIO_BPS = '9000';
 process.env.OUTBOX_INTERVAL_MS = '0';
 
@@ -89,6 +95,27 @@ export function signBankWebhook(
     Buffer.from(`${timestamp}.${raw}`),
     createPrivateKey(pem(bankKeys.privateKey, 'pkcs8')),
   ).toString('base64');
+  return {
+    raw: options.tamper ? raw.replace(/\d+/, '999') : raw,
+    headers: {
+      'content-type': 'application/json',
+      'x-bank-timestamp': timestamp,
+      'x-bank-signature': signature,
+    },
+  };
+}
+
+export const HMAC_SECRET = 'hmac-test-secret-0123456789';
+
+export function signHmacWebhook(
+  body: object,
+  options: { timestamp?: number; secret?: string; tamper?: boolean } = {},
+) {
+  const raw = JSON.stringify(body);
+  const timestamp = String(options.timestamp ?? Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', options.secret ?? HMAC_SECRET)
+    .update(`${timestamp}.${raw}`)
+    .digest('hex');
   return {
     raw: options.tamper ? raw.replace(/\d+/, '999') : raw,
     headers: {

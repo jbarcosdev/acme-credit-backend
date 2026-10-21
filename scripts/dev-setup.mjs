@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +18,12 @@ function ensureKeyPair(name) {
   return { public: readFileSync(publicPath, 'utf8'), private: readFileSync(privatePath, 'utf8') };
 }
 
+function ensureSecret(name) {
+  const path = join(keysDir, `${name}.secret`);
+  if (!existsSync(path)) writeFileSync(path, randomBytes(32).toString('hex'), { mode: 0o600 });
+  return readFileSync(path, 'utf8').trim();
+}
+
 const quoted = (pem) => `"${pem.trim().replace(/\n/g, '\\n')}"`;
 const auth = ensureKeyPair('auth');
 const bank = ensureKeyPair('bank');
@@ -34,4 +40,8 @@ function writeEnv(service, values) {
 }
 
 writeEnv('lending', { AUTH_PUBLIC_KEY: quoted(auth.public), SERVICE_PRIVATE_KEY: quoted(auth.private) });
-writeEnv('collateral', { AUTH_PUBLIC_KEY: quoted(auth.public), BANK_SIM_PUBLIC_KEY: quoted(bank.public) });
+writeEnv('collateral', {
+  AUTH_PUBLIC_KEY: quoted(auth.public),
+  BANK_SIM_PUBLIC_KEY: quoted(bank.public),
+  BANK_HMAC_SECRET: ensureSecret('bank-hmac'),
+});

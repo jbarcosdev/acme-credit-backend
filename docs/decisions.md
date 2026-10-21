@@ -73,7 +73,6 @@ ECS Fargate behind an ALB (public, with WAF) and an internal ALB for service-to-
 ## Known limitations
 
 - Deferred purchases (installments) are designed but not implemented; the `DEFERRED` bucket already exists in the model.
-- Only the asymmetric bank signature scheme is implemented; HMAC for banks that need it is designed.
 - Service tokens come from a local key; the production issuer is an open decision.
 - Interest uses UTC dates; per-product time zones are not modelled.
 - Reversing a purchase that was already paid is rejected (no credit balances or refunds).
