@@ -1,0 +1,30 @@
+{
+  "name": "@acme/messaging",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Event publisher and consumer ports with SNS/SQS and in-memory adapters",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "oxlint src/",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sns": "^3.1154.0",
+    "@aws-sdk/client-sqs": "^3.1154.0"
+  },
+  "devDependencies": {
+    "@acme/contracts": "workspace:*"
+  }
+}

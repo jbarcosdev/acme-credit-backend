@@ -1,0 +1,3 @@
+image_tag       = "git-sha"
+certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/replace-me"
+auth_issuer     = "https://idp.example.com"

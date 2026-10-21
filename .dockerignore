@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/coverage
+**/.env
+.git
+.dev
+.claude
+.DS_Store
+docs
+terraform
+**/*.tsbuildinfo

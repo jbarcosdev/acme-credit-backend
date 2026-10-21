@@ -1,21 +1,14 @@
-# Decisiones de diseño
+# Decisiones
 
-Registro cronológico. Cada entrada: contexto, opciones consideradas, decisión, trade-offs.
+Las decisiones de arquitectura y sus alternativas descartadas están en `docs/decisions.md` (visibles para quien revise el repositorio). Este archivo solo lleva lo pendiente.
 
-## Decisiones tomadas
+## Pendiente
 
-- Stack: NestJS (TypeScript). Directiva del usuario.
-- Arquitectura: microservicios. Directiva del usuario; falta definir los límites de servicio y justificarlos.
-- Contenedores: Docker. Despliegue tentativo en ECS con Fargate por simplicidad operativa (sin gestionar nodos).
-- Package manager: yarn 4 con node-modules en vez de PnP, para compatibilidad con Docker e IDE.
-
-## Pendientes de decidir
-
-- Límites de los microservicios y comunicación entre ellos (HTTP, mensajería, eventos). Decidir si es monorepo Nest (`apps/` y `libs/`) o repos separados.
-- Persistencia (en memoria, SQLite o PostgreSQL en contenedor) y control de concurrencia (locks pesimistas, versionado optimista, serialización por cuenta).
-- Modelo de dinero y ledger de doble entrada.
-- Idempotencia, outbox/eventos y auditoría.
-- Autenticación/autorización simulada y manejo de secretos.
-- Alcance extra: intereses, estados de cuenta, mora, congelamiento de tarjeta, aumentos de límite.
-- IaC (Terraform/AWS) y estrategia de despliegue.
-- Estrategia de pruebas.
+- Emisor real de tokens de servicio (hoy llave local) y autenticación reciente para operaciones sensibles.
+- Zona horaria por producto para cortes e intereses (hoy UTC).
+- Servicio externo de condiciones del producto (hoy adaptador estático).
+- Congelar tarjeta.
+- Reducciones de cupo forzadas desde custodia (fraude, contracargos).
+- Conciliación diaria de depósitos contra el estado de cuenta del banco.
+- Rate limiting por aplicación, revocación de tokens, rol de operaciones.
+- Aplicar Terraform en una cuenta real y añadir pipeline de CI/CD.

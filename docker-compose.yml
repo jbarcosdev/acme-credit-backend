@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-postgres}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_ADMIN_USER:-postgres}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:4.9
+    environment:
+      SERVICES: sns,sqs
+      DEFAULT_REGION: us-east-1
+    ports:
+      - '${LOCALSTACK_PORT:-4566}:4566'
+    volumes:
+      - ./docker/localstack/init.sh:/etc/localstack/init/ready.d/init.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'awslocal sqs get-queue-url --queue-name lending-limit-events >/dev/null 2>&1']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  collateral-migrate:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: migrate, args: { SERVICE: collateral } }
+    environment:
+      DATABASE_URL: postgresql://collateral:collateral@postgres:5432/collateral
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  lending-migrate:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: migrate, args: { SERVICE: lending } }
+    environment:
+      DATABASE_URL: postgresql://lending:lending@postgres:5432/lending
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  collateral:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: runtime, args: { SERVICE: collateral, PORT: '3001' } }
+    env_file: services/collateral/.env
+    environment:
+      PORT: '3001'
+      DATABASE_URL: postgresql://collateral:collateral@postgres:5432/collateral
+      AWS_ENDPOINT_URL: http://localstack:4566
+    ports:
+      - '3001:3001'
+    depends_on:
+      collateral-migrate: { condition: service_completed_successfully }
+      localstack: { condition: service_healthy }
+
+  lending:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: runtime, args: { SERVICE: lending, PORT: '3000' } }
+    env_file: services/lending/.env
+    environment:
+      PORT: '3000'
+      NODE_ENV: development
+      DEV_CLOCK: 'true'
+      DATABASE_URL: postgresql://lending:lending@postgres:5432/lending
+      REDIS_URL: redis://redis:6379
+      CUSTODY_URL: http://collateral:3001
+      AWS_ENDPOINT_URL: http://localstack:4566
+      LIMIT_EVENTS_QUEUE_URL: http://localstack:4566/000000000000/lending-limit-events
+    ports:
+      - '3000:3000'
+    depends_on:
+      lending-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      localstack: { condition: service_healthy }
+      collateral: { condition: service_healthy }
+
+volumes:
+  postgres-data:
+  redis-data:
