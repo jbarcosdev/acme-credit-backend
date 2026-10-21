@@ -76,6 +76,8 @@ A purchase made with `installments` (offered by the terms: months and APR) is po
 
 **Why.** Delinquency, payments, statements, closure and charge-off keep working unchanged because deferred debt becomes ordinary debt exactly when it is billed. **Alternatives rejected:** a separate installment ledger (a second source of truth for the same balance) and amortizing at purchase time (the customer would pay interest on installments not yet due).
 
+Amortization is French (fixed installment, decreasing interest on the remaining principal at APR/12, last installment absorbs rounding); the schedule is not stored, each installment is computed when it is billed. German amortization or a stored/exposed schedule can be added later without touching the rest of the billing flow.
+
 Reversal is only allowed before the plan exists; early payoff is not offered; closing accelerates the plan without charging future interest.
 
 ## Known limitations
