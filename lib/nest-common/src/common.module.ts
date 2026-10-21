@@ -9,7 +9,7 @@ import {
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ClsModule } from 'nestjs-cls';
 import { AccessLogMiddleware } from './access-log.middleware.js';
-import { Clock, SystemClock } from './clock.js';
+import { Clock, OffsetClock, SystemClock } from './clock.js';
 import { DomainExceptionFilter } from './domain-exception.filter.js';
 import { HealthModule } from './health/health.module.js';
 
@@ -21,7 +21,10 @@ export class CommonModule implements NestModule {
       .forRoutes({ path: '{*splat}', method: RequestMethod.ALL });
   }
 
-  static register(): DynamicModule {
+  static register(options: { devClock?: boolean } = {}): DynamicModule {
+    if (options.devClock && process.env.NODE_ENV === 'production') {
+      throw new Error('The development clock cannot be enabled in production');
+    }
     return {
       module: CommonModule,
       global: true,
@@ -43,7 +46,10 @@ export class CommonModule implements NestModule {
             transform: true,
           }),
         },
-        { provide: Clock, useClass: SystemClock },
+        {
+          provide: Clock,
+          useClass: options.devClock ? OffsetClock : SystemClock,
+        },
       ],
       exports: [Clock],
     };

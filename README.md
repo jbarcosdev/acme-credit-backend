@@ -81,6 +81,7 @@ Contra los servicios en marcha (cualquiera de las dos opciones) ejecuta y muestr
 | `pnpm token -- --sub=user-1` | Imprime un JWT de desarrollo (`--principal=service --scope="..."` para tokens de servicio) |
 | `pnpm bank:confirm -- --reference=DEP-... --amount=100000` | Simula el webhook del banco (`--bank=hmac-bank` para el banco con HMAC) |
 | `pnpm jobs:daily` | Ejecuta ahora los jobs diarios: cortes, estados de cuenta, mora y cierre por impago |
+| `pnpm seed`, `pnpm scenarios` | Cliente de pruebas y verificación de casos de uso (ver `AGENTS.md`) |
 | `pnpm --filter @acme/lending prisma:migrate` | Crea una migración nueva en desarrollo (requiere `DATABASE_URL`) |
 | `pnpm check` | Compila, hace lint y corre todas las pruebas |
 | `pnpm prompts:export` | Regenera `PROMPTS.md` a partir de la transcripción de la sesión |
@@ -210,6 +211,17 @@ Repetir una petición con la misma `Idempotency-Key` y el mismo cuerpo devuelve 
 
 Para ver estados de cuenta, intereses y mora no hace falta esperar al mes: las pruebas avanzan un reloj simulado, y `pnpm jobs:daily` ejecuta los cortes que ya correspondan a la fecha real.
 
+## Para agentes y pruebas guiadas
+
+[`AGENTS.md`](AGENTS.md) es una guía para que un agente (o una persona) levante la plataforma y verifique los casos de uso sin leer el código: cómo levantarla, un seed con un cliente de pruebas, cada caso con la petición y el resultado esperado, cómo simular el paso del tiempo y los códigos de error. Los comandos principales:
+
+```bash
+pnpm seed                # cliente de pruebas con custodia, depósito confirmado y tarjeta activa (idempotente); imprime ids y tokens
+pnpm scenarios           # 12 escenarios, 61 verificaciones contra los servicios en marcha (código de salida 0 si todo pasa)
+```
+
+Para simular facturación sin esperar meses, lending expone en local un reloj de desarrollo que solo avanza (`DEV_CLOCK=true`; el servicio se niega a arrancar con él en producción): `POST /internal/dev/clock` avanza el tiempo y `POST /internal/jobs/daily` ejecuta cortes, mora y cierre por impago.
+
 ## Cómo funciona
 
 ### Arquitectura
@@ -329,7 +341,7 @@ pnpm infra:up     # las pruebas de integración lo necesitan
 pnpm check        # compila, lint, pruebas unitarias, de integración y end-to-end
 ```
 
-Son 128 pruebas:
+Son 132 pruebas automáticas más los 12 escenarios de `pnpm scenarios` contra el stack levantado:
 
 - **Unitarias:** dinero, redondeo, fechas, anualidades de cuotas, autenticación, cachés, bus en memoria y log de acceso.
 - **Integración** (PostgreSQL, Redis y LocalStack reales): entrega de SNS a SQS, reentrega y dead-lettering; compare-and-set en Redis.

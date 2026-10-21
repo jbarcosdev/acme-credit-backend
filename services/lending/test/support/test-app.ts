@@ -43,22 +43,22 @@ export interface TestContext {
 
 export async function createTestApp(
   env: Record<string, string> = {},
+  options: { keepClock?: boolean } = {},
 ): Promise<TestContext> {
   Object.assign(process.env, env);
   const custody = new FakeCustodyClient();
   const cache = new InMemoryCache();
   const clock = new FixedClock(new Date('2026-01-10T12:00:00Z'));
   const bus = new InMemoryEventBus();
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  const builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(CustodyClient)
     .useValue(custody)
     .overrideProvider(Cache)
     .useValue(cache)
-    .overrideProvider(Clock)
-    .useValue(clock)
     .overrideProvider(EventConsumer)
-    .useValue(bus)
-    .compile();
+    .useValue(bus);
+  if (!options.keepClock) builder.overrideProvider(Clock).useValue(clock);
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication({ logger: false });
   await app.listen(0);
   return { app, prisma: app.get(PrismaService), custody, cache, clock, bus };

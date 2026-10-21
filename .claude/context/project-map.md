@@ -13,7 +13,8 @@ lib/
 e2e/            prueba completa entre los dos servicios
 docker/         service.Dockerfile (targets runtime y migrate), init de Postgres y LocalStack
 terraform/      modules/{network,ecr,messaging,postgres,redis,alb,ecs-service,ecs-job}, environments/dev
-scripts/        dev-setup, mint-token, simulate-bank-webhook, run-daily-jobs, demo, export-prompts
+scripts/        dev-setup, mint-token, simulate-bank-webhook, run-daily-jobs, demo, seed, scenarios, export-prompts (lib/stack.mjs comparte utilidades)
+AGENTS.md       guía para agentes: levantar, seed, casos de uso con resultado esperado, reloj de desarrollo
 docs/           domains, flows, security, decisions
 apps/           vacío
 ```

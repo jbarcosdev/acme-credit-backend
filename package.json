@@ -26,7 +26,9 @@
     "demo": "node scripts/demo.mjs",
     "apps:up": "docker compose --profile apps up -d --build",
     "apps:down": "docker compose --profile apps down",
-    "prompts:export": "node scripts/export-prompts.mjs"
+    "prompts:export": "node scripts/export-prompts.mjs",
+    "seed": "node scripts/seed.mjs",
+    "scenarios": "node scripts/scenarios.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

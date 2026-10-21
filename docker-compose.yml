@@ -78,6 +78,8 @@ services:
     env_file: services/lending/.env
     environment:
       PORT: '3000'
+      NODE_ENV: development
+      DEV_CLOCK: 'true'
       DATABASE_URL: postgresql://lending:lending@postgres:5432/lending
       REDIS_URL: redis://redis:6379
       CUSTODY_URL: http://collateral:3001

@@ -1553,3 +1553,74 @@ de acuerdo, todos los tests pasan, por favor, actualiza el readme con todos los 
 ### Response
 
 Antes de reescribir el README verifico que la ruta "servicios en el host + LocalStack" realmente funciona tal como la voy a documentar.
+
+Reescribí el [README.md](README.md) en español y lo commiteé (`68baeab`, rama `feat/monorepo`). Seguí las dos formas de levantar el proyecto que documenté: los servicios en contenedores con `pnpm apps:up` y los servicios en la máquina con la infraestructura en Docker. Probé también la ejecución en la máquina, y `pnpm demo` terminó bien con los servicios corriendo ahí contra LocalStack. `pnpm check` pasa completo (128 pruebas).
+
+El README ahora cubre:
+- **Cómo levantar:** requisitos, las dos formas de levantarlo, qué hace `pnpm demo` y una tabla de comandos.
+- **LocalStack:** qué recursos crea el script de inicio (tópico `custody-events`, cola `lending-limit-events` y su DLQ), el flujo del evento de cupo y comandos `awslocal`/`redis-cli` para inspeccionarlo.
+- **Variables de entorno:** las de ambos servicios, con sus valores por defecto.
+- **Probar a mano:** una secuencia completa con `curl`: depósito, webhook bancario firmado, tarjeta, compra normal y diferida, pago y cierre.
+- **Cómo funciona:** arquitectura, ciclo de vida de la tarjeta, mecánica de crédito (intereses, mora, cuotas, cierre) y referencia de la API.
+- **Operación:** tabla de garantías con dónde se prueba cada una, pruebas, despliegue en AWS, estructura del repositorio, límites conocidos y solución de problemas.
+
+Cambios que hice para que la ruta documentada funcione:
+- **Variables de entorno:** `pnpm dev:lending` y `pnpm dev:collateral` no leían los `.env`, así que ambos servicios ahora cargan `.env` al arrancar (`import 'dotenv/config'` en `main.ts`).
+- **Cola SQS:** cambié la URL en `.env.example` de lending al formato `http://localhost:4566/...`, que funciona desde la máquina sin depender de DNS.
+
+Dos cosas por confirmar:
+- **Idioma:** `docs/decisions.md` sigue en inglés y el README lo avisa. Si prefieres todo en español, lo traduzco.
+- **`pnpm bank:confirm`:** solo funciona con los servicios en marcha; sin ellos falla por conexión rechazada, como esperaba.
+
+La rama sigue sin empujarse al remoto. ¿La empujo y abro el PR?
+
+## Turn 42
+
+### Prompt
+
+algo que olvidé definir antes es la tabla de amortización que se aplica para compras diferidas. estás usando francesa, alemana o no estás generando una?
+
+### Response
+
+Uso el sistema francés (anualidad, cuota fija), y no genero una tabla de amortización guardada.
+
+**Cómo funciona hoy**
+- **Cuota fija:** al crear el plan se calcula una cuota fija con la fórmula de anualidad, en enteros: `P · r · (1+r)^n / ((1+r)^n − 1)`, con `r = tasa anual / 12`. Si la tasa es 0%, la cuota es `P / n`. Está en `installments.ts` (`annuityPayment`).
+- **Reparto por corte:** cada corte factura una cuota. El interés se calcula sobre el capital pendiente (`capital pendiente · tasa anual / 12`) y el resto de la cuota amortiza capital. Con el tiempo el interés baja y el capital sube.
+- **Última cuota:** absorbe el redondeo: su capital es todo lo que quede pendiente. Por eso puede diferir unos centavos de las anteriores.
+- **Dónde vive:** la tabla `installment_plans` guarda el estado del plan (cuota fija, capital pendiente y cuántas cuotas se han facturado), y cada cuota se calcula al facturarla. `buildSchedule` genera el cronograma completo solo para las pruebas. No se persiste ni se expone por la API. Lo que queda registrado son los movimientos de cada corte y las líneas de cuotas en el estado de cuenta.
+
+**Qué implica**
+- **Cronograma por adelantado:** si el cliente o el comercio necesitan ver el calendario completo antes de aprobar, hay que añadirlo. Sería un endpoint de consulta basado en `buildSchedule`, sin tabla nueva.
+- **Cambiar de sistema:** pasar al alemán (capital constante, interés decreciente) es un cambio pequeño. Habría que reemplazar `annuityPayment` y `nextInstallment` (capital = `P / n`, interés sobre el saldo). El resto del flujo de facturación, pagos y mora no cambia. También se podría elegir el sistema por plan, como parte de las opciones de cuotas.
+- **Convención de tasa:** uso tasa nominal anual dividida entre 12, no una base de 365 días como en el interés revolvente. Es la convención habitual de cuotas mensuales fijas, pero si el producto necesita otra, conviene definirlo ahora.
+
+¿Dejo el francés como está, o prefieres alemán o que sea configurable por plan? Si quieres, también añado el endpoint con el cronograma.
+
+## Turn 43
+
+### Prompt
+
+como no es crédito, dejemos francesa por el momento.
+
+### Response
+
+Queda la amortización francesa, sin cambios de código. Dejé la decisión anotada en el ADR 15 de `docs/decisions.md`: cuota fija, interés decreciente sobre el saldo a tasa anual dividida entre 12, la última cuota absorbe el redondeo y el cronograma no se guarda. Es el commit `fc7db1d`.
+
+La rama `feat/monorepo` sigue sin empujarse. ¿La empujo y abro el PR, o hay algo más por ajustar antes?
+
+## Turn 44
+
+### Prompt
+
+ves necesario crear un documento MD para agentes, que le permita simular todo el proceso? yo lo he hecho manualmente, pero alguien que quiera testearlo con su agente, lo pueda levantar y hacer las llamadas, testear los casos de uso básico y verificar que recibe lo esperado? podríamos hacer un seed para ese caso con un usuario de pruebas.
+
+### Response
+
+Sí lo veo necesario, y conviene que sea más que un documento: un seed idempotente con usuario de pruebas, un reloj de desarrollo para poder simular facturación sin esperar meses, y un runner de escenarios que verifica lo esperado. Empiezo por el reloj de desarrollo (solo local, nunca en producción).
+
+Ahora los scripts: un módulo común, el seed idempotente y el runner de escenarios.
+
+La protección funcionó: el contenedor corre con `NODE_ENV=production` y se negó a arrancar con el reloj de desarrollo. Para el stack local de compose, lending corre en modo desarrollo.
+
+Los 12 escenarios pasan contra el stack real (61 verificaciones). Compruebo que se pueden repetir (el reloj ya avanzó) y que el seed es idempotente.
