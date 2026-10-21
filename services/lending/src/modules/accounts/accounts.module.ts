@@ -4,12 +4,26 @@ import { LimitsModule } from '../limits/limits.module.js';
 import { AccountsController } from './accounts.controller.js';
 import { AccountsService } from './accounts.service.js';
 import { AuthorizationsController } from './authorizations.controller.js';
+import { ClosureService } from './closure.service.js';
+import { LimitReductionService } from './limit-reduction.service.js';
 import { LedgerService } from './ledger.service.js';
 
 @Module({
   imports: [LimitsModule],
   controllers: [AccountsController, AuthorizationsController],
-  providers: [AccountsService, LedgerService, IdempotencyService, AuditService],
-  exports: [AccountsService, LedgerService],
+  providers: [
+    AccountsService,
+    LedgerService,
+    ClosureService,
+    LimitReductionService,
+    IdempotencyService,
+    AuditService,
+  ],
+  exports: [
+    AccountsService,
+    LedgerService,
+    ClosureService,
+    LimitReductionService,
+  ],
 })
 export class AccountsModule {}

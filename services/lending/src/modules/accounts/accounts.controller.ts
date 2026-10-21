@@ -18,12 +18,22 @@ import {
 } from '@acme/auth';
 import { IdempotencyKeyHeader } from '@acme/nest-common';
 import { AccountsService } from './accounts.service.js';
-import { PaymentDto, RequestCardDto } from './dto/accounts.dto.js';
+import { ClosureService } from './closure.service.js';
+import {
+  LimitReductionDto,
+  PaymentDto,
+  RequestCardDto,
+} from './dto/accounts.dto.js';
+import { LimitReductionService } from './limit-reduction.service.js';
 
 @Controller()
 @RequirePrincipal('user')
 export class AccountsController {
-  constructor(private readonly accounts: AccountsService) {}
+  constructor(
+    private readonly accounts: AccountsService,
+    private readonly closure: ClosureService,
+    private readonly reduction: LimitReductionService,
+  ) {}
 
   @Post('cards')
   async requestCard(
@@ -69,6 +79,31 @@ export class AccountsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.accounts.pay(user, id, key, dto);
+    res.status(result.statusCode);
+    return result.body;
+  }
+
+  @Post('accounts/:id/closure')
+  async close(
+    @CurrentUser() user: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @IdempotencyKeyHeader() key: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.closure.requestClosure(user, id, key);
+    res.status(result.statusCode);
+    return result.body;
+  }
+
+  @Post('accounts/:id/limit-reduction')
+  async reduce(
+    @CurrentUser() user: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+    @IdempotencyKeyHeader() key: string,
+    @Body() dto: LimitReductionDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.reduction.request(user, id, key, dto.newCupo);
     res.status(result.statusCode);
     return result.body;
   }

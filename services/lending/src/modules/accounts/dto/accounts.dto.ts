@@ -31,3 +31,8 @@ export class PaymentDto {
   @IsMinorUnits()
   amount!: number;
 }
+
+export class LimitReductionDto {
+  @IsMinorUnits({ min: 0 })
+  newCupo!: number;
+}
