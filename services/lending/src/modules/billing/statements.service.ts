@@ -3,7 +3,7 @@ import type { CurrentUserInfo } from '@acme/auth';
 import { fromMinor, NotFoundError } from '@acme/nest-common';
 import { PrismaService } from '../../shared/prisma.service.js';
 import { AccountsService } from '../accounts/accounts.service.js';
-import type { StatementView } from './billing.types.js';
+import type { PlanView, StatementView } from './billing.types.js';
 
 const iso = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -40,6 +40,25 @@ export class StatementsService {
     return this.view(statement);
   }
 
+  async plans(user: CurrentUserInfo, accountId: string): Promise<PlanView[]> {
+    await this.accounts.findOwned(user, accountId);
+    const plans = await this.prisma.installmentPlan.findMany({
+      where: { accountId },
+      orderBy: { createdAt: 'asc' },
+    });
+    return plans.map((p) => ({
+      id: p.id,
+      purchaseMovementId: p.purchaseMovementId,
+      principal: fromMinor(p.principal),
+      installments: p.installments,
+      aprBps: p.aprBps,
+      installmentAmount: fromMinor(p.installmentAmount),
+      billed: p.billedCount,
+      remainingPrincipal: fromMinor(p.remainingPrincipal),
+      status: p.status,
+    }));
+  }
+
   private view(
     s: Awaited<ReturnType<PrismaService['statement']['findUniqueOrThrow']>>,
   ): StatementView {
@@ -58,6 +77,11 @@ export class StatementsService {
       closingBalance: fromMinor(s.closingBalance),
       minimumPayment: fromMinor(s.minimumPayment),
       termsVersion: s.termsVersion,
+      installmentPrincipal: fromMinor(s.installmentPrincipal),
+      installmentInterest: fromMinor(s.installmentInterest),
+      deferredPurchases: fromMinor(s.deferredPurchases),
+      deferredBalance: fromMinor(s.deferredBalance),
+      installments: s.installmentDetails,
     };
   }
 }

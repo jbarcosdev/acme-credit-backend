@@ -64,6 +64,8 @@ export interface AuthorizationResult {
   status: 'APPROVED' | 'DECLINED';
   reason?: string;
   availableCredit: number;
+  installments?: number;
+  installmentAprBps?: number;
 }
 
 @Injectable()
@@ -203,10 +205,13 @@ export class AccountsService {
   ): Promise<IdempotentResult<AuthorizationResult>> {
     const account = await this.prisma.cardAccount.findUnique({
       where: { id: accountId },
-      select: { custodyAccountId: true },
+      select: { custodyAccountId: true, termsVersion: true },
     });
     if (!account)
       throw new NotFoundError('ACCOUNT_NOT_FOUND', 'Account not found');
+    const deferral = dto.installments
+      ? await this.resolveInstallments(account.termsVersion, dto)
+      : undefined;
     const cupo = await this.limits.getCupo(account.custodyAccountId);
 
     return this.run(
@@ -229,10 +234,12 @@ export class AccountsService {
 
         const posted = await this.ledger.post(tx, row, {
           type: 'PURCHASE',
-          bucket: 'PRINCIPAL',
+          bucket: deferral ? 'DEFERRED' : 'PRINCIPAL',
           direction: 'DEBIT',
           amount,
           note: dto.merchant,
+          installments: deferral?.installments,
+          rateBps: deferral?.rateBps,
         });
         await this.audit.record(tx, {
           action: 'authorization.approved',
@@ -246,6 +253,12 @@ export class AccountsService {
             authorizationId: posted.movementId,
             status: 'APPROVED',
             availableCredit: fromMinor(available - amount),
+            ...(deferral
+              ? {
+                  installments: deferral.installments,
+                  installmentAprBps: deferral.rateBps,
+                }
+              : {}),
           },
         };
       },
@@ -287,15 +300,25 @@ export class AccountsService {
             'ALREADY_REVERSED',
             'The authorization was already reversed',
           );
-        if (row.principal < original.amount)
+        if (original.bucket === 'DEFERRED') {
+          const plan = await tx.installmentPlan.findUnique({
+            where: { purchaseMovementId: original.id },
+          });
+          if (plan)
+            throw new UnprocessableError(
+              'DEFERRED_PURCHASE_ALREADY_BILLED',
+              'The deferred purchase already started billing and cannot be reversed',
+            );
+        } else if (row.principal < original.amount) {
           throw new UnprocessableError(
             'REVERSAL_EXCEEDS_BALANCE',
             'The authorization was already paid and cannot be reversed',
           );
+        }
 
         const posted = await this.ledger.post(tx, row, {
           type: 'REVERSAL',
-          bucket: 'PRINCIPAL',
+          bucket: original.bucket,
           direction: 'CREDIT',
           amount: original.amount,
           referenceMovementId: original.id,
@@ -381,6 +404,24 @@ export class AccountsService {
     if (!row) throw new NotFoundError('ACCOUNT_NOT_FOUND', 'Account not found');
     this.policy.assertCanAccessOwned(user, row.owner_id);
     return row;
+  }
+
+  private async resolveInstallments(termsVersion: number, dto: AuthorizeDto) {
+    const terms = await this.terms.getVersion(termsVersion);
+    const option = terms.installmentOptions.find(
+      (o) => o.months === dto.installments,
+    );
+    if (!option)
+      throw new UnprocessableError(
+        'INSTALLMENTS_NOT_AVAILABLE',
+        'The requested number of installments is not offered',
+      );
+    if (BigInt(dto.amount) < terms.minInstallmentPurchase)
+      throw new UnprocessableError(
+        'AMOUNT_BELOW_INSTALLMENT_MINIMUM',
+        'The purchase is below the minimum amount for installments',
+      );
+    return { installments: option.months, rateBps: option.aprBps };
   }
 
   private decline(

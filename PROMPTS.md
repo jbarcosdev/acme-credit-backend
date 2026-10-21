@@ -1458,3 +1458,61 @@ El stack completo corre en contenedores (migraciones, ambos servicios, Postgres,
 Ahora la IaC en Terraform (ECS Fargate): red, ECR, SNS/SQS con DLQ y alarmas, un RDS por servicio, Redis, ALBs, servicios y jobs programados.
 
 Implementación y verificación completas. Ahora la documentación: README para evaluadores, ADRs en `docs/` y ajuste de los diagramas a lo realmente implementado.
+
+La primera versión completa está implementada y commiteada en la rama `feat/monorepo` (13 commits, ninguno con atribución a Claude). No la empujé al remoto.
+
+**Estado de las pruebas:** `pnpm check` pasa con 107 tests. Los de integración corren contra PostgreSQL, Redis y LocalStack reales:
+- 15 en las librerías.
+- 5 unitarios en lending.
+- 57 e2e de lending, incluida una prueba de propiedades sobre secuencias aleatorias de operaciones.
+- 29 e2e de collateral.
+- 1 prueba entre los dos servicios, con HTTP real, webhook firmado, SNS/SQS y Redis.
+
+También probé el stack completo en contenedores con `pnpm apps:up` y `pnpm demo`.
+
+**Qué hace**
+- **`collateral`:** cuentas de custodia y depósitos confirmados por webhook bancario firmado con Ed25519. Calcula el cupo, liquida el colateral al cerrar y lo libera al reducir el cupo. Avisa los cambios de cupo con un outbox transaccional hacia SNS.
+- **`lending`:**
+  - Tarjetas, autorizaciones, reversos y pagos.
+  - Estados de cuenta con corte los días 1 y 15, intereses sobre el saldo diario promedio, cargo por mora, recuperación del estado activo y cierre por impago.
+  - Cierre voluntario con aplicación del colateral y reducción de cupo.
+- **Garantías:**
+  - Bloqueo de fila para que una compra nunca exceda el límite.
+  - Idempotencia en la misma transacción que el efecto.
+  - Diario de movimientos inmutable por triggers de base de datos.
+  - Dinero en enteros.
+  - Acceso por dueño de la cuenta.
+- **Infra:** Dockerfile, perfil `apps` en compose y Terraform para ECS Fargate (VPC, ALB con WAF, un RDS por servicio, Redis, SNS/SQS con DLQ y alarmas, jobs programados). Terraform está validado con `terraform validate`, pero nunca aplicado en AWS.
+
+**Un hallazgo real de las pruebas**
+Una compra en vuelo que había leído el cupo anterior podía aprobarse por encima del nuevo límite tras una reducción. Ahora el tope propio se mantiene un margen configurable (`LIMIT_CAP_RELEASE_SECONDS`, 300 s por defecto) después de actualizar Redis. Quedó en `docs/decisions.md`.
+
+**Cosas que debes saber**
+- **LocalStack:** la imagen `latest` ya exige token de cuenta, así que fijé la 4.9.
+- **Idioma:** escribí `README.md` y `docs/decisions.md` en inglés porque el enunciado del reto está en inglés. El resto de `docs/` está en español. Si prefieres todo en un idioma, lo traduzco.
+- **`PROMPTS.md`:** lo genera `pnpm prompts:export` desde la transcripción de esta sesión, con prompts y respuestas en orden. Los resultados crudos de herramientas no van. Hay que volver a correrlo al final para incluir los últimos mensajes.
+- **No implementado:**
+  - Compras diferidas: el modelo está preparado, pero la lógica de cuotas no existe (fase 2).
+  - HMAC para bancos que no firmen con llave asimétrica.
+  - El emisor real de tokens de servicio: hoy usa una llave local.
+  - Zona horaria por producto: hoy todo es UTC.
+
+Lo pendiente está en `.claude/context/decisions.md`. Siguientes pasos naturales: empujar la rama y abrir el PR, o empezar la fase 2 de cuotas diferidas. ¿Cuál prefieres?
+
+## Turn 40
+
+### Prompt
+
+procedamos con compras diferidas como lo conversamos y HMAC. los otros dos lo puedes ignorar, no son necesarios por el momento.
+
+### Response
+
+Empiezo por HMAC para bancos (más acotado) y luego las compras diferidas.
+
+Ahora el módulo, el arnés de pruebas y los tests HMAC.
+
+Ahora las compras diferidas. Empiezo por el esquema y la migración.
+
+Voy ajustando la capa de cuentas para diferidos (validación de cuotas, compra en el bucket diferido, reverso solo antes de facturar). Sigo con tipos, DTO y ledger.
+
+Funciona también en contenedores. Commiteo y actualizo `PROMPTS.md`.

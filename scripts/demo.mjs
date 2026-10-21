@@ -56,6 +56,7 @@ step('request card (limit derived from the collateral)', card);
 const purchase = (amount) => call(lendingUrl, 'POST', `/accounts/${card.body.id}/authorizations`, { auth: network, key: randomUUID(), body: { amount, merchant: 'demo shop' } });
 step('purchase 60000', await purchase(60_000));
 step('purchase 40000 (exceeds the available credit)', await purchase(40_000));
+step('purchase 12000 in 3 installments (counts fully against the limit, billed later)', await call(lendingUrl, 'POST', `/accounts/${card.body.id}/authorizations`, { auth: network, key: randomUUID(), body: { amount: 12_000, installments: 3, merchant: 'demo store' } }));
 step('pay 20000', await call(lendingUrl, 'POST', `/accounts/${card.body.id}/payments`, { auth: user, key: randomUUID(), body: { amount: 20_000 } }));
 step('account', await call(lendingUrl, 'GET', `/accounts/${card.body.id}`, { auth: user }));
 step('close account (collateral applied to the debt, the rest released)', await call(lendingUrl, 'POST', `/accounts/${card.body.id}/closure`, { auth: user, key: randomUUID() }));

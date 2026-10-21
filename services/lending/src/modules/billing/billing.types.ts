@@ -17,4 +17,21 @@ export interface StatementView {
   closingBalance: number;
   minimumPayment: number;
   termsVersion: number;
+  installmentPrincipal: number;
+  installmentInterest: number;
+  deferredPurchases: number;
+  deferredBalance: number;
+  installments: unknown;
+}
+
+export interface PlanView {
+  id: string;
+  purchaseMovementId: string;
+  principal: number;
+  installments: number;
+  aprBps: number;
+  installmentAmount: number;
+  billed: number;
+  remainingPrincipal: number;
+  status: string;
 }

@@ -150,6 +150,10 @@ export class ClosureService {
         where: { id: accountId },
         data: { status: 'CLOSED', closedAt: this.clock.now() },
       });
+      await tx.installmentPlan.updateMany({
+        where: { accountId, status: 'ACTIVE' },
+        data: { status: 'ACCELERATED' },
+      });
       await this.audit.record(tx, {
         action: 'account.closed',
         entityType: 'card_account',

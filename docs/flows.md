@@ -181,3 +181,26 @@ sequenceDiagram
 El tope propio se guarda en Postgres dentro de la misma transacción que valida la deuda, así ninguna compra puede superar el nuevo cupo mientras Redis aún tiene el anterior. Si la llamada a custodia falla, el tope permanece y un job de reintento completa la operación con la misma clave idempotente.
 
 El tope no se retira al terminar: se marca como asentado y se libera pasado un margen (`LIMIT_CAP_RELEASE_SECONDS`, 300 por defecto), de forma perezosa en la siguiente autorización o en el job diario. El margen cubre las autorizaciones en vuelo que ya leyeron el cupo anterior de Redis antes de la actualización; sin él, una de ellas podía aprobarse por encima del nuevo límite (hallazgo de un test de concurrencia).
+
+## 8. Compra diferida a cuotas
+
+```mermaid
+sequenceDiagram
+    actor M as Comercio / red
+    participant L as lending-service
+    participant B as billing
+    participant DB as Postgres lending
+
+    M->>L: POST autorización (monto, installments = 3)
+    L->>L: valida plan y monto mínimo según las condiciones de la cuenta
+    L->>DB: PURCHASE en el bucket DEFERRED (guarda cuotas y tasa)
+    L-->>M: aprobada (el disponible baja por el monto completo)
+    B->>B: corte del ciclo
+    B->>DB: crea el plan con cuota fija (anualidad, enteros)
+    B->>DB: cuota k: DEFERRED -capital, PRINCIPAL +capital, INTEREST +interés de la cuota
+    B->>DB: estado de cuenta con la línea de la cuota, mínimo no menor a la cuota
+    Note over B,DB: lo facturado y no pagado es deuda normal: genera interés revolvente desde el siguiente ciclo
+    B->>DB: última cuota absorbe el redondeo, plan COMPLETED
+```
+
+Reglas: la primera cuota se factura en el primer corte posterior a la compra. El saldo diferido no es pagable por adelantado y no genera interés revolvente. Un reverso solo es posible antes de que el plan exista. Al cerrar la cuenta el plan se acelera: el saldo diferido entra en la deuda que cubre el colateral y no se cobran intereses futuros.

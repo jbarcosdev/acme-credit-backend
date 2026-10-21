@@ -23,6 +23,8 @@ enum MovementType {
   INTEREST
   LATE_FEE
   COLLATERAL_APPLICATION
+  INSTALLMENT_PRINCIPAL
+  INSTALLMENT_INTEREST
 }
 
 enum Bucket {
@@ -60,6 +62,7 @@ model CardAccount {
   movements         Movement[]
   profile           BillingProfile?
   statements        Statement[]
+  plans             InstallmentPlan[]
 
   @@index([ownerId])
   @@index([status])
@@ -67,19 +70,22 @@ model CardAccount {
 }
 
 model Movement {
-  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId           String       @map("account_id") @db.Uuid
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId           String           @map("account_id") @db.Uuid
   type                MovementType
   bucket              Bucket
   direction           Direction
   amount              BigInt
-  bucketBalanceAfter  BigInt       @map("bucket_balance_after")
-  referenceMovementId String?      @map("reference_movement_id") @db.Uuid
-  statementId         String?      @map("statement_id") @db.Uuid
+  bucketBalanceAfter  BigInt           @map("bucket_balance_after")
+  referenceMovementId String?          @map("reference_movement_id") @db.Uuid
+  statementId         String?          @map("statement_id") @db.Uuid
   note                String?
-  effectiveAt         DateTime     @default(now()) @map("effective_at") @db.Timestamptz()
-  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz()
-  account             CardAccount  @relation(fields: [accountId], references: [id])
+  installments        Int?
+  rateBps             Int?             @map("rate_bps")
+  effectiveAt         DateTime         @default(now()) @map("effective_at") @db.Timestamptz()
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  account             CardAccount      @relation(fields: [accountId], references: [id])
+  plan                InstallmentPlan?
 
   @@index([accountId, effectiveAt])
   @@index([referenceMovementId])
@@ -129,25 +135,30 @@ model BillingProfile {
 }
 
 model Statement {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId       String            @map("account_id") @db.Uuid
-  cycleNumber     Int               @map("cycle_number")
-  periodStart     DateTime          @map("period_start") @db.Date
-  periodEnd       DateTime          @map("period_end") @db.Date
-  dueDate         DateTime          @map("due_date") @db.Date
-  openingBalance  BigInt            @map("opening_balance")
-  purchases       BigInt
-  reversals       BigInt
-  payments        BigInt
-  interestCharged BigInt            @map("interest_charged")
-  feesCharged     BigInt            @map("fees_charged")
-  closingBalance  BigInt            @map("closing_balance")
-  minimumPayment  BigInt            @map("minimum_payment")
-  termsVersion    Int               @map("terms_version")
-  termsSnapshot   Json              @map("terms_snapshot")
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz()
-  account         CardAccount       @relation(fields: [accountId], references: [id])
-  outcome         StatementOutcome?
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId            String            @map("account_id") @db.Uuid
+  cycleNumber          Int               @map("cycle_number")
+  periodStart          DateTime          @map("period_start") @db.Date
+  periodEnd            DateTime          @map("period_end") @db.Date
+  dueDate              DateTime          @map("due_date") @db.Date
+  openingBalance       BigInt            @map("opening_balance")
+  purchases            BigInt
+  reversals            BigInt
+  payments             BigInt
+  interestCharged      BigInt            @map("interest_charged")
+  feesCharged          BigInt            @map("fees_charged")
+  installmentPrincipal BigInt            @default(0) @map("installment_principal")
+  installmentInterest  BigInt            @default(0) @map("installment_interest")
+  deferredPurchases    BigInt            @default(0) @map("deferred_purchases")
+  deferredBalance      BigInt            @default(0) @map("deferred_balance")
+  installmentDetails   Json              @default("[]") @map("installment_details")
+  closingBalance       BigInt            @map("closing_balance")
+  minimumPayment       BigInt            @map("minimum_payment")
+  termsVersion         Int               @map("terms_version")
+  termsSnapshot        Json              @map("terms_snapshot")
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  account              CardAccount       @relation(fields: [accountId], references: [id])
+  outcome              StatementOutcome?
 
   @@unique([accountId, cycleNumber])
   @@index([dueDate])
@@ -161,4 +172,24 @@ model StatementOutcome {
   statement   Statement @relation(fields: [statementId], references: [id])
 
   @@map("statement_outcomes")
+}
+
+model InstallmentPlan {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId          String      @map("account_id") @db.Uuid
+  purchaseMovementId String      @unique @map("purchase_movement_id") @db.Uuid
+  principal          BigInt
+  installments       Int
+  aprBps             Int         @map("apr_bps")
+  installmentAmount  BigInt      @map("installment_amount")
+  remainingPrincipal BigInt      @map("remaining_principal")
+  billedCount        Int         @default(0) @map("billed_count")
+  status             String      @default("ACTIVE")
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+  account            CardAccount @relation(fields: [accountId], references: [id])
+  purchase           Movement    @relation(fields: [purchaseMovementId], references: [id])
+
+  @@index([accountId, status])
+  @@map("installment_plans")
 }

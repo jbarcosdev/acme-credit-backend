@@ -53,7 +53,7 @@ Dueño del crédito: deuda, movimientos, estados de cuenta, intereses y mora. El
 | Módulo | Responsabilidad |
 | --- | --- |
 | accounts | Cuenta de la tarjeta (incluye el día de corte elegido), diario de movimientos (compras, reversos, pagos, intereses, cargos, aplicación de colateral), autorización, pagos, cierre con liquidación y reducción de cupo con tope propio |
-| billing | Perfil de facturación por cuenta (día de corte 1 o 15, ciclo vigente, versión de condiciones), estados de cuenta, cálculo de intereses, cargos por mora, detección de morosidad y cierre por impago |
+| billing | Perfil de facturación por cuenta (ciclo vigente), estados de cuenta, cálculo de intereses, planes de cuotas de compras diferidas, cargos por mora, detección de morosidad y cierre por impago |
 | limits | Puerto `LimitSource`, lectura y escritura del cupo en Redis, consulta a custodia ante falta de dato, consumidor de `custody.limit-changed`, política ante falla |
 | health | Healthcheck |
 

@@ -52,7 +52,7 @@ Lending marks the account `CLOSING` (no purchases, no payments), computes the de
 
 Statements, interest and fees are movements on the same journal and need a deterministic snapshot of it at the cut. Separating them would turn the cut into a distributed read plus idempotent writes against a balance that authorizations update concurrently. The module boundary is strict (billing only uses the public interface of accounts) so it can be extracted or run as its own scheduled task later.
 
-Rules implemented: cut on day 1 or 15 chosen by the customer; interest on the average daily balance of principal only (no interest on interest or fees); statements are immutable and carry a snapshot of the terms used; minimum payment = max(floor, percentage), capped at the balance; late fee charged once per statement when the minimum is not paid by the due date; payments apply to fees, then interest, then principal; automatic closure after N days past due, applying the collateral.
+Deferred purchases (installments) are described in decision 15. Rules implemented: cut on day 1 or 15 chosen by the customer; interest on the average daily balance of principal only (no interest on interest or fees); statements are immutable and carry a snapshot of the terms used; minimum payment = max(floor, percentage), capped at the balance; late fee charged once per statement when the minimum is not paid by the due date; payments apply to fees, then interest, then principal; automatic closure after N days past due, applying the collateral.
 
 ## 11. Ports and adapters at the edges
 
@@ -60,7 +60,7 @@ Messaging, cache, custody client, bank adapters, token verification and product 
 
 ## 12. Identity is somebody else's problem, authorization is local
 
-Services only verify signed JWTs (public key or JWKS) and build a `CurrentUser`. Customers can only touch accounts whose `ownerId` equals their subject (otherwise `404`, to avoid leaking existence). Service-to-service calls and the card network use service tokens with explicit scopes. Banks are authenticated by an asymmetric signature over the raw body plus a timestamp, with a per-deposit unguessable reference.
+Services only verify signed JWTs (public key or JWKS) and build a `CurrentUser`. Customers can only touch accounts whose `ownerId` equals their subject (otherwise `404`, to avoid leaking existence). Service-to-service calls and the card network use service tokens with explicit scopes. Banks are authenticated per bank with either an Ed25519 signature or an HMAC-SHA256 (for banks that only support a shared secret), both over the timestamp and the raw body, plus a per-deposit unguessable reference.
 
 ## 13. Prisma per service, pnpm monorepo
 
@@ -70,9 +70,16 @@ One schema, one migration history and one generated client per database, never s
 
 ECS Fargate behind an ALB (public, with WAF) and an internal ALB for service-to-service traffic, one RDS instance per service, ElastiCache Redis, SNS/SQS with alarms, EventBridge Scheduler running the daily jobs as a task, migrations as one-off tasks. See `terraform/`.
 
+## 15. Installments reuse the journal: unbilled principal in its own bucket
+
+A purchase made with `installments` (offered by the terms: months and APR) is posted to the `DEFERRED` bucket, so the whole amount counts against the limit from day one while staying out of the payable debt and out of revolving interest. Billing creates a plan at the first cut after the purchase (fixed annuity installment computed with integer arithmetic, last installment absorbs the rounding). At every cut, one installment is billed with three movements: `DEFERRED` credit, `PRINCIPAL` debit and `INTEREST` debit (the installment interest on the remaining principal). From then on the billed amount is ordinary debt: it appears on the statement, counts toward the minimum payment (which can never be lower than the installment), follows the payment cascade, can become delinquent and accrues revolving interest if left unpaid.
+
+**Why.** Delinquency, payments, statements, closure and charge-off keep working unchanged because deferred debt becomes ordinary debt exactly when it is billed. **Alternatives rejected:** a separate installment ledger (a second source of truth for the same balance) and amortizing at purchase time (the customer would pay interest on installments not yet due).
+
+Reversal is only allowed before the plan exists; early payoff is not offered; closing accelerates the plan without charging future interest.
+
 ## Known limitations
 
-- Deferred purchases (installments) are designed but not implemented; the `DEFERRED` bucket already exists in the model.
 - Service tokens come from a local key; the production issuer is an open decision.
 - Interest uses UTC dates; per-product time zones are not modelled.
 - Reversing a purchase that was already paid is rejected (no credit balances or refunds).

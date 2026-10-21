@@ -4,6 +4,8 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
+  Min,
   MaxLength,
 } from 'class-validator';
 import { IsMinorUnits } from '@acme/nest-common';
@@ -25,6 +27,12 @@ export class AuthorizeDto {
   @IsString()
   @MaxLength(120)
   merchant?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(2)
+  @Max(60)
+  installments?: number;
 }
 
 export class PaymentDto {

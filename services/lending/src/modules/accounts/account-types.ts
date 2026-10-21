@@ -5,7 +5,9 @@ export type MovementKind =
   | 'PAYMENT'
   | 'INTEREST'
   | 'LATE_FEE'
-  | 'COLLATERAL_APPLICATION';
+  | 'COLLATERAL_APPLICATION'
+  | 'INSTALLMENT_PRINCIPAL'
+  | 'INSTALLMENT_INTEREST';
 export type BucketName = 'PRINCIPAL' | 'DEFERRED' | 'INTEREST' | 'FEES';
 export type DirectionName = 'DEBIT' | 'CREDIT';
 
@@ -33,6 +35,8 @@ export interface MovementEntry {
   referenceMovementId?: string;
   statementId?: string;
   note?: string;
+  installments?: number;
+  rateBps?: number;
   effectiveAt?: Date;
 }
 

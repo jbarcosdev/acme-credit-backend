@@ -120,6 +120,7 @@ The full reasoning, with the alternatives that were rejected, is in [`docs/decis
 - **Statements.** Each card is cut on day 1 or 15 (customer's choice). A statement is immutable and records opening balance, purchases, payments, reversals, interest, fees, closing balance, minimum payment, due date and a snapshot of the terms applied.
 - **Interest.** Average daily balance of principal over the cycle times the APR; no interest on interest or fees.
 - **Late fees and delinquency.** If the minimum is not paid by the due date, one late fee is charged and the account becomes `DELINQUENT` (no purchases). Paying the minimum returns it to `ACTIVE`.
+- **Installments.** A purchase can be deferred in 3, 6 or 12 months (configurable terms with their own APR). The whole amount counts against the limit immediately; one fixed annuity installment is billed at each cut and, once billed, behaves like any other debt.
 - **Closure.** A customer closes the account, or it is charged off after N days past due. Collateral is applied to the debt and the remainder is released; a shortfall is recorded.
 - **Limit reduction.** The customer can lower the limit if the debt fits under the new one; the freed collateral is released.
 
@@ -143,7 +144,7 @@ All money amounts are integers in minor units (cents). All mutating endpoints be
 | Endpoint | Caller |
 | --- | --- |
 | `POST /cards`, `GET /accounts/:id`, `GET /accounts/:id/movements`, `GET /accounts/:id/statements[/:n]` | customer |
-| `POST /accounts/:id/payments`, `POST /accounts/:id/closure`, `POST /accounts/:id/limit-reduction` | customer |
+| `POST /accounts/:id/payments`, `POST /accounts/:id/closure`, `POST /accounts/:id/limit-reduction`, `GET /accounts/:id/installment-plans` | customer |
 | `POST /accounts/:id/authorizations`, `POST /accounts/:id/authorizations/:authId/reversals` | card network (`authorizations:write`) |
 | `POST /internal/jobs/daily` | scheduler (`jobs:run`) |
 
@@ -187,7 +188,6 @@ The design was driven by me and implemented with Claude Code: I decided the arch
 
 ## Trade-offs and what is not done
 
-- Installments (deferred purchases) are designed ([`docs/decisions.md`](docs/decisions.md)) but not implemented.
 - Banks are simulated (one Ed25519 and one HMAC adapter). The identity provider and the service-token issuer are assumed, not built.
 - The terms service is a static adapter.
 - Interest dates use UTC; time zones per product are not modelled.

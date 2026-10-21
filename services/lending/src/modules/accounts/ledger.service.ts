@@ -78,6 +78,8 @@ export class LedgerService {
         referenceMovementId: entry.referenceMovementId,
         statementId: entry.statementId,
         note: entry.note,
+        installments: entry.installments,
+        rateBps: entry.rateBps,
         effectiveAt: entry.effectiveAt ?? this.clock.now(),
       },
     });

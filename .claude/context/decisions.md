@@ -4,8 +4,6 @@ Las decisiones de arquitectura y sus alternativas descartadas están en `docs/de
 
 ## Pendiente
 
-- Compras diferidas a cuotas (fase 2): planes de cuotas en billing, cuotas en el estado de cuenta y en el pago mínimo, reclasificación de `DEFERRED` a capital en cada corte, vencimiento anticipado al cerrar.
-- Esquema HMAC para bancos que no firmen con llave asimétrica.
 - Emisor real de tokens de servicio (hoy llave local) y autenticación reciente para operaciones sensibles.
 - Zona horaria por producto para cortes e intereses (hoy UTC).
 - Servicio externo de condiciones del producto (hoy adaptador estático).

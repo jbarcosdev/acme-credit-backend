@@ -1,3 +1,8 @@
+export interface InstallmentOption {
+  months: number;
+  aprBps: number;
+}
+
 export interface LendingTerms {
   version: number;
   aprBps: number;
@@ -7,6 +12,8 @@ export interface LendingTerms {
   chargeOffDays: number;
   dueDays: number;
   cycleDays: number[];
+  installmentOptions: InstallmentOption[];
+  minInstallmentPurchase: bigint;
 }
 
 export abstract class LendingTermsProvider {
@@ -40,5 +47,20 @@ export function defaultLendingTerms(
     chargeOffDays: Number(env.TERMS_CHARGE_OFF_DAYS ?? 90),
     dueDays: Number(env.TERMS_DUE_DAYS ?? 20),
     cycleDays: [1, 15],
+    installmentOptions: parseInstallmentOptions(
+      env.TERMS_INSTALLMENT_OPTIONS ?? '3:0,6:1800,12:2400',
+    ),
+    minInstallmentPurchase: BigInt(env.TERMS_MIN_INSTALLMENT_PURCHASE ?? 5000),
   };
+}
+
+function parseInstallmentOptions(value: string): InstallmentOption[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const [months, aprBps] = item.split(':').map(Number);
+      return { months, aprBps };
+    });
 }

@@ -3,12 +3,36 @@ import { Injectable } from '@nestjs/common';
 import { AuditService, Clock } from '@acme/nest-common';
 import { LendingTermsProvider } from '../../clients/terms/lending-terms.provider.js';
 import { PrismaService } from '../../shared/prisma.service.js';
+import type { Prisma } from '../../generated/prisma/client.js';
+import type { AccountRow } from '../accounts/account-types.js';
 import { LedgerService } from '../accounts/ledger.service.js';
 import { addDays, dateOnly, daysBetween, nextCutDate } from './dates.js';
+import { annuityPayment, nextInstallment } from './installments.js';
 import { interestFor, minimumPaymentFor } from './rounding.js';
 import type { Tx } from './billing.types.js';
 
 const MAX_CUTS_PER_ACCOUNT = 36;
+
+export interface InstallmentDetail {
+  planId: string;
+  purchaseMovementId: string;
+  number: number;
+  of: number;
+  principal: string;
+  interest: string;
+  amount: string;
+}
+
+function minimumWithInstallments(
+  closing: bigint,
+  minPaymentBps: number,
+  floor: bigint,
+  installmentsDue: bigint,
+): bigint {
+  const base = minimumPaymentFor(closing, minPaymentBps, floor);
+  const minimum = base > installmentsDue ? base : installmentsDue;
+  return minimum < closing ? minimum : closing;
+}
 
 @Injectable()
 export class CycleService {
@@ -95,9 +119,10 @@ export class CycleService {
         },
         orderBy: [{ effectiveAt: 'asc' }, { createdAt: 'asc' }],
       });
-      const priorPrincipal = await this.principalBefore(
+      const priorPrincipal = await this.balanceBefore(
         tx,
         accountId,
+        ['PRINCIPAL'],
         periodStart,
       );
       const sumOfDailyBalances = this.sumDailyPrincipal(
@@ -107,33 +132,68 @@ export class CycleService {
         priorPrincipal,
       );
 
-      const total = (type: string, direction: 'DEBIT' | 'CREDIT') =>
+      const total = (
+        type: string,
+        direction: 'DEBIT' | 'CREDIT',
+        bucket?: string,
+      ) =>
         movements
-          .filter((m) => m.type === type && m.direction === direction)
+          .filter(
+            (m) =>
+              m.type === type &&
+              m.direction === direction &&
+              (bucket === undefined || m.bucket === bucket),
+          )
           .reduce((sum, m) => sum + m.amount, 0n);
-      const purchases = total('PURCHASE', 'DEBIT');
-      const reversals = total('REVERSAL', 'CREDIT');
+      const purchases = total('PURCHASE', 'DEBIT', 'PRINCIPAL');
+      const reversals = total('REVERSAL', 'CREDIT', 'PRINCIPAL');
+      const deferredPurchases =
+        total('PURCHASE', 'DEBIT', 'DEFERRED') -
+        total('REVERSAL', 'CREDIT', 'DEFERRED');
       const payments = total('PAYMENT', 'CREDIT');
       const feesCharged = total('LATE_FEE', 'DEBIT');
 
       const statementId = randomUUID();
       const interest = interestFor(sumOfDailyBalances, terms.aprBps);
+      let current = row;
       if (interest > 0n) {
-        await this.ledger.post(tx, row, {
-          type: 'INTEREST',
-          bucket: 'INTEREST',
-          direction: 'DEBIT',
-          amount: interest,
-          statementId,
-          effectiveAt: new Date(periodEndInstant.getTime() - 1),
-        });
+        current = (
+          await this.ledger.post(tx, current, {
+            type: 'INTEREST',
+            bucket: 'INTEREST',
+            direction: 'DEBIT',
+            amount: interest,
+            statementId,
+            effectiveAt: new Date(periodEndInstant.getTime() - 1),
+          })
+        ).account;
       }
+      const installments = await this.billInstallments(
+        tx,
+        current,
+        statementId,
+        periodEndInstant,
+      );
 
       const closing =
-        opening + purchases + interest + feesCharged - reversals - payments;
-      const billed = await this.billedDebtBefore(
+        opening +
+        purchases +
+        interest +
+        feesCharged +
+        installments.principal +
+        installments.interest -
+        reversals -
+        payments;
+      const billed = await this.balanceBefore(
         tx,
         accountId,
+        ['PRINCIPAL', 'INTEREST', 'FEES'],
+        periodEndInstant,
+      );
+      const deferredBalance = await this.balanceBefore(
+        tx,
+        accountId,
+        ['DEFERRED'],
         periodEndInstant,
       );
       if (closing !== billed) {
@@ -165,11 +225,18 @@ export class CycleService {
           payments,
           interestCharged: interest,
           feesCharged,
+          installmentPrincipal: installments.principal,
+          installmentInterest: installments.interest,
+          deferredPurchases,
+          deferredBalance,
+          installmentDetails:
+            installments.details as unknown as Prisma.InputJsonValue,
           closingBalance: closing,
-          minimumPayment: minimumPaymentFor(
+          minimumPayment: minimumWithInstallments(
             closing,
             terms.minPaymentBps,
             terms.minPaymentFloor,
+            installments.principal + installments.interest,
           ),
           termsVersion: terms.version,
           termsSnapshot: snapshot,
@@ -198,27 +265,133 @@ export class CycleService {
     });
   }
 
-  private async principalBefore(
+  private async balanceBefore(
     tx: Tx,
     accountId: string,
-    instant: Date,
-  ): Promise<bigint> {
-    const rows = await tx.$queryRaw<{ balance: bigint | null }[]>`
-      SELECT COALESCE(SUM(CASE WHEN direction = 'DEBIT' THEN amount ELSE -amount END), 0)::bigint AS balance
-      FROM movements WHERE account_id = ${accountId}::uuid AND bucket = 'PRINCIPAL' AND effective_at < ${instant}`;
-    return rows[0]?.balance ?? 0n;
-  }
-
-  private async billedDebtBefore(
-    tx: Tx,
-    accountId: string,
+    buckets: string[],
     instant: Date,
   ): Promise<bigint> {
     const rows = await tx.$queryRaw<{ balance: bigint | null }[]>`
       SELECT COALESCE(SUM(CASE WHEN direction = 'DEBIT' THEN amount ELSE -amount END), 0)::bigint AS balance
       FROM movements
-      WHERE account_id = ${accountId}::uuid AND bucket IN ('PRINCIPAL', 'INTEREST', 'FEES') AND effective_at < ${instant}`;
+      WHERE account_id = ${accountId}::uuid AND bucket::text = ANY(${buckets}) AND effective_at < ${instant}`;
     return rows[0]?.balance ?? 0n;
+  }
+
+  private async billInstallments(
+    tx: Tx,
+    row: AccountRow,
+    statementId: string,
+    cutInstant: Date,
+  ): Promise<{
+    principal: bigint;
+    interest: bigint;
+    details: InstallmentDetail[];
+  }> {
+    const fresh = await tx.movement.findMany({
+      where: {
+        accountId: row.id,
+        type: 'PURCHASE',
+        bucket: 'DEFERRED',
+        effectiveAt: { lt: cutInstant },
+        plan: null,
+      },
+      orderBy: [{ effectiveAt: 'asc' }, { id: 'asc' }],
+    });
+    for (const purchase of fresh) {
+      const reversed = await tx.movement.findFirst({
+        where: { referenceMovementId: purchase.id, type: 'REVERSAL' },
+      });
+      if (reversed || !purchase.installments || purchase.rateBps === null)
+        continue;
+      await tx.installmentPlan.create({
+        data: {
+          accountId: row.id,
+          purchaseMovementId: purchase.id,
+          principal: purchase.amount,
+          installments: purchase.installments,
+          aprBps: purchase.rateBps,
+          installmentAmount: annuityPayment(
+            purchase.amount,
+            purchase.installments,
+            purchase.rateBps,
+          ),
+          remainingPrincipal: purchase.amount,
+        },
+      });
+    }
+
+    const plans = await tx.installmentPlan.findMany({
+      where: { accountId: row.id, status: 'ACTIVE' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const effectiveAt = new Date(cutInstant.getTime() - 1);
+    let current = row;
+    let principal = 0n;
+    let interest = 0n;
+    const details: InstallmentDetail[] = [];
+    for (const plan of plans) {
+      const bill = nextInstallment(plan);
+      if (bill.principal > 0n) {
+        current = (
+          await this.ledger.post(tx, current, {
+            type: 'INSTALLMENT_PRINCIPAL',
+            bucket: 'DEFERRED',
+            direction: 'CREDIT',
+            amount: bill.principal,
+            referenceMovementId: plan.purchaseMovementId,
+            statementId,
+            effectiveAt,
+          })
+        ).account;
+        current = (
+          await this.ledger.post(tx, current, {
+            type: 'INSTALLMENT_PRINCIPAL',
+            bucket: 'PRINCIPAL',
+            direction: 'DEBIT',
+            amount: bill.principal,
+            referenceMovementId: plan.purchaseMovementId,
+            statementId,
+            effectiveAt,
+          })
+        ).account;
+      }
+      if (bill.interest > 0n) {
+        current = (
+          await this.ledger.post(tx, current, {
+            type: 'INSTALLMENT_INTEREST',
+            bucket: 'INTEREST',
+            direction: 'DEBIT',
+            amount: bill.interest,
+            referenceMovementId: plan.purchaseMovementId,
+            statementId,
+            effectiveAt,
+          })
+        ).account;
+      }
+      const remaining = plan.remainingPrincipal - bill.principal;
+      const billedCount = plan.billedCount + 1;
+      await tx.installmentPlan.update({
+        where: { id: plan.id },
+        data: {
+          remainingPrincipal: remaining,
+          billedCount,
+          status: billedCount === plan.installments ? 'COMPLETED' : 'ACTIVE',
+        },
+      });
+      principal += bill.principal;
+      interest += bill.interest;
+      details.push({
+        planId: plan.id,
+        purchaseMovementId: plan.purchaseMovementId,
+        number: bill.number,
+        of: plan.installments,
+        principal: bill.principal.toString(),
+        interest: bill.interest.toString(),
+        amount: bill.amount.toString(),
+      });
+    }
+    return { principal, interest, details };
   }
 
   private sumDailyPrincipal(

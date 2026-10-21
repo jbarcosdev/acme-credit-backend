@@ -42,6 +42,15 @@ export class BillingController {
     return this.statements.get(user, id, cycleNumber);
   }
 
+  @Get('accounts/:id/installment-plans')
+  @RequirePrincipal('user')
+  plans(
+    @CurrentUser() user: CurrentUserInfo,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.statements.plans(user, id);
+  }
+
   @Post('internal/jobs/daily')
   @RequirePrincipal('service')
   @RequireScopes(SCOPES.jobsRun)
