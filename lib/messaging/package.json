@@ -19,5 +19,10 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "oxlint src/",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@acme/contracts": "workspace:*",
+    "@aws-sdk/client-sns": "^3.1154.0",
+    "@aws-sdk/client-sqs": "^3.1154.0"
   }
 }
