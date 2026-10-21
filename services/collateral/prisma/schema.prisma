@@ -8,3 +8,108 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum CustodyAccountStatus {
+  OPEN
+  CLOSED
+}
+
+enum DepositStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+enum CustodyMovementType {
+  DEPOSIT
+  RELEASE
+  APPLIED
+}
+
+model CustodyAccount {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String               @map("owner_id")
+  currency     String               @default("USD")
+  heldAmount   BigInt               @default(0) @map("held_amount")
+  limitVersion Int                  @default(0) @map("limit_version")
+  status       CustodyAccountStatus @default(OPEN)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz()
+  deposits     Deposit[]
+  movements    CustodyMovement[]
+
+  @@index([ownerId])
+  @@map("custody_accounts")
+}
+
+model Deposit {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  custodyAccountId String         @map("custody_account_id") @db.Uuid
+  bankId           String         @map("bank_id")
+  reference        String         @unique
+  amount           BigInt
+  status           DepositStatus  @default(PENDING)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  confirmedAt      DateTime?      @map("confirmed_at") @db.Timestamptz()
+  account          CustodyAccount @relation(fields: [custodyAccountId], references: [id])
+
+  @@index([custodyAccountId])
+  @@map("deposits")
+}
+
+model CustodyMovement {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  custodyAccountId String              @map("custody_account_id") @db.Uuid
+  type             CustodyMovementType
+  amount           BigInt
+  heldAfter        BigInt              @map("held_after")
+  depositId        String?             @map("deposit_id") @db.Uuid
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz()
+  account          CustodyAccount      @relation(fields: [custodyAccountId], references: [id])
+
+  @@index([custodyAccountId, createdAt])
+  @@map("custody_movements")
+}
+
+model IdempotencyKey {
+  scope       String
+  ownerId     String   @map("owner_id")
+  key         String
+  requestHash String   @map("request_hash")
+  statusCode  Int?     @map("status_code")
+  response    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@id([scope, ownerId, key])
+  @@map("idempotency_keys")
+}
+
+model AuditLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId       String   @map("actor_id")
+  actorType     String   @map("actor_type")
+  action        String
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  correlationId String?  @map("correlation_id")
+  data          Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}
+
+model OutboxEvent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type          String
+  payload       Json
+  correlationId String?   @map("correlation_id")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz()
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at") @db.Timestamptz()
+  lastError     String?   @map("last_error")
+
+  @@index([publishedAt, nextAttemptAt])
+  @@map("outbox_events")
+}

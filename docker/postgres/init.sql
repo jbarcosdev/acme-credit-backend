@@ -5,3 +5,15 @@ REVOKE CONNECT ON DATABASE lending FROM PUBLIC;
 CREATE USER collateral WITH PASSWORD 'collateral';
 CREATE DATABASE collateral OWNER collateral;
 REVOKE CONNECT ON DATABASE collateral FROM PUBLIC;
+
+CREATE DATABASE lending_test OWNER lending;
+REVOKE CONNECT ON DATABASE lending_test FROM PUBLIC;
+
+CREATE DATABASE collateral_test OWNER collateral;
+REVOKE CONNECT ON DATABASE collateral_test FROM PUBLIC;
+
+CREATE DATABASE lending_shadow OWNER lending;
+REVOKE CONNECT ON DATABASE lending_shadow FROM PUBLIC;
+
+CREATE DATABASE collateral_shadow OWNER collateral;
+REVOKE CONNECT ON DATABASE collateral_shadow FROM PUBLIC;

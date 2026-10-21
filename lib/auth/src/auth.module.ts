@@ -22,6 +22,7 @@ export class AuthModule {
   ): DynamicModule {
     return {
       module: AuthModule,
+      global: true,
       providers: [
         {
           provide: TokenVerifier,
