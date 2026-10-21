@@ -27,6 +27,21 @@ services:
       timeout: 3s
       retries: 10
 
+  localstack:
+    image: localstack/localstack:4.9
+    environment:
+      SERVICES: sns,sqs
+      DEFAULT_REGION: us-east-1
+    ports:
+      - '${LOCALSTACK_PORT:-4566}:4566'
+    volumes:
+      - ./docker/localstack/init.sh:/etc/localstack/init/ready.d/init.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'awslocal sqs get-queue-url --queue-name lending-limit-events >/dev/null 2>&1']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
   postgres-data:
   redis-data:

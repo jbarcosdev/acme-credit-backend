@@ -7,3 +7,4 @@ coverage
 services/*/src/generated
 .claude/settings.local.json
 .claude/CLAUDE.local.md
+.dev

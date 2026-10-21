@@ -14,6 +14,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.2
         version: 4.1.12(vitest@4.1.12)
+      jose:
+        specifier: ^6.2.13
+        version: 6.2.13
       oxlint:
         specifier: ^1.58.0
         version: 1.89.0
@@ -26,6 +29,46 @@ importers:
       vitest:
         specifier: ^4.1.2
         version: 4.1.12(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0))
+
+  e2e:
+    dependencies:
+      '@acme/messaging':
+        specifier: workspace:*
+        version: link:../lib/messaging
+      '@aws-sdk/client-sns':
+        specifier: ^3.0.0
+        version: 3.1154.0
+      '@aws-sdk/client-sqs':
+        specifier: ^3.0.0
+        version: 3.1154.0
+      '@nestjs/common':
+        specifier: ^12.0.1
+        version: 12.2.0(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^12.0.1
+        version: 12.2.0(@nestjs/common@12.2.0(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^12.0.1
+        version: 12.2.0(@nestjs/common@12.2.0(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
+      ioredis:
+        specifier: ^5.0.0
+        version: 5.11.1
+      jose:
+        specifier: ^6.0.0
+        version: 6.2.13
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
+      supertest:
+        specifier: ^7.0.0
+        version: 7.3.1
+    devDependencies:
+      '@types/supertest':
+        specifier: ^7.0.0
+        version: 7.2.1
 
   lib/auth:
     dependencies:
@@ -59,15 +102,16 @@ importers:
 
   lib/messaging:
     dependencies:
-      '@acme/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@aws-sdk/client-sns':
         specifier: ^3.1154.0
         version: 3.1154.0
       '@aws-sdk/client-sqs':
         specifier: ^3.1154.0
         version: 3.1154.0
+    devDependencies:
+      '@acme/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   lib/nest-common:
     dependencies:
@@ -558,6 +602,9 @@ packages:
     peerDependenciesMeta:
       '@types/node':
         optional: true
+
+  '@ioredis/commands@1.10.0':
+    resolution: {integrity: sha512-UmeW7z4LfctwoQ5wkhVzgq8tXkreED2xZGpX+Bg+zA+WJFZCT6c062AfCK/Dfk81xZnnwdhJCUMkitihRaoC2Q==}
 
   '@ioredis/commands@2.0.0':
     resolution: {integrity: sha512-vrx0AE/T0h7cRZwfo1M39Cr+ZhZrkf0V8mQN75wucKCxCLD9l/VX6no3gFvrLqD1IlG/1LtzWovqEw3t0Vr9zg==}
@@ -1746,6 +1793,10 @@ packages:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
 
+  ioredis@5.11.1:
+    resolution: {integrity: sha512-ehuGcf94bQXhfagULNXrJdfnWO38v070jxSx/qE87Kjzmu2fU7ro5EFAb+OPituLqgfyuQaym5DlrNydW2sJ9A==}
+    engines: {node: '>=12.22.0'}
+
   ioredis@6.0.0:
     resolution: {integrity: sha512-f+Dtubxfpf6KYFq7WVXJoOLn0bk4TJrMrN9SzeE+jrWrCWj7XX3fA6vkryafhADX+GMymRxgDJDOI33COkJc0w==}
     engines: {node: '>=20.0.0'}
@@ -2205,6 +2256,10 @@ packages:
 
   redis-errors@1.2.0:
     resolution: {integrity: sha512-1qny3OExCf0UvUV/5wpYKf2YwPcOqXzkwKKSmKHiE6ZMQs5heeE/c8eXK+PNllPvmjgAbfnsbpkGZWy8cBpn9w==}
+    engines: {node: '>=4'}
+
+  redis-parser@3.0.0:
+    resolution: {integrity: sha512-DJnGAeenTdpMEH6uAJRK/uiyEIH9WVsUmoLwzudwGJUwZPp80PDBWPHXSAGNPwNvIXAbe7MSUB1zQFugFml66A==}
     engines: {node: '>=4'}
 
   reflect-metadata@0.2.2:
@@ -2936,6 +2991,8 @@ snapshots:
   '@inquirer/type@4.2.0(@types/node@24.19.2)':
     optionalDependencies:
       '@types/node': 24.19.2
+
+  '@ioredis/commands@1.10.0': {}
 
   '@ioredis/commands@2.0.0': {}
 
@@ -4090,6 +4147,18 @@ snapshots:
 
   internmap@2.0.3: {}
 
+  ioredis@5.11.1:
+    dependencies:
+      '@ioredis/commands': 1.10.0
+      cluster-key-slot: 1.1.1
+      debug: 4.4.3
+      denque: 2.1.0
+      redis-errors: 1.2.0
+      redis-parser: 3.0.0
+      standard-as-callback: 2.1.0
+    transitivePeerDependencies:
+      - supports-color
+
   ioredis@6.0.0:
     dependencies:
       '@ioredis/commands': 2.0.0
@@ -4493,6 +4562,10 @@ snapshots:
   readdirp@5.1.1: {}
 
   redis-errors@1.2.0: {}
+
+  redis-parser@3.0.0:
+    dependencies:
+      redis-errors: 1.2.0
 
   reflect-metadata@0.2.2: {}
 

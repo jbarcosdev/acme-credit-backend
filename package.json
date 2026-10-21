@@ -18,11 +18,16 @@
     "dev:lending": "pnpm --filter @acme/lending start:dev",
     "dev:collateral": "pnpm --filter @acme/collateral start:dev",
     "infra:up": "docker compose up -d --wait",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "dev:setup": "node scripts/dev-setup.mjs",
+    "token": "node scripts/mint-token.mjs",
+    "bank:confirm": "node scripts/simulate-bank-webhook.mjs",
+    "jobs:daily": "node scripts/run-daily-jobs.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.1.2",
+    "jose": "^6.2.13",
     "oxlint": "^1.58.0",
     "prettier": "^3.4.2",
     "typescript": "^6.0.2",

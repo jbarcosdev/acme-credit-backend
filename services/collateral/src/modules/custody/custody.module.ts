@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SNSClient } from '@aws-sdk/client-sns';
 import {
+  awsConfigFromEnv,
   EventPublisher,
   InMemoryEventBus,
   SnsEventPublisher,
@@ -64,7 +65,7 @@ import { InternalCustodyController } from './internal-custody.controller.js';
       useFactory: () =>
         process.env.EVENT_BUS === 'sns'
           ? new SnsEventPublisher(
-              new SNSClient({ endpoint: process.env.AWS_ENDPOINT_URL }),
+              new SNSClient(awsConfigFromEnv()),
               process.env.EVENTS_TOPIC_ARN as string,
             )
           : new InMemoryEventBus(),

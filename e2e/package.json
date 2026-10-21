@@ -1,0 +1,28 @@
+{
+  "name": "@acme/e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo \"nothing to build\"",
+    "lint": "oxlint test/",
+    "test": "echo \"no unit tests\"",
+    "test:e2e": "vitest run --config ./vitest.config.ts"
+  },
+  "dependencies": {
+    "@acme/messaging": "workspace:*",
+    "@aws-sdk/client-sns": "^3.0.0",
+    "@aws-sdk/client-sqs": "^3.0.0",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/platform-express": "^12.0.1",
+    "ioredis": "^5.0.0",
+    "jose": "^6.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "supertest": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/supertest": "^7.0.0"
+  }
+}

@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import { LocalServiceTokenProvider, ServiceTokenProvider } from '@acme/auth';
 import { Cache, InMemoryCache, RedisCache } from '@acme/cache';
 import {
+  awsConfigFromEnv,
   EventConsumer,
   InMemoryEventBus,
   SqsEventConsumer,
@@ -55,10 +56,9 @@ import {
       provide: EventConsumer,
       useFactory: () =>
         process.env.EVENT_BUS === 'sqs'
-          ? new SqsEventConsumer(
-              new SQSClient({ endpoint: process.env.AWS_ENDPOINT_URL }),
-              { queueUrl: process.env.LIMIT_EVENTS_QUEUE_URL as string },
-            )
+          ? new SqsEventConsumer(new SQSClient(awsConfigFromEnv()), {
+              queueUrl: process.env.LIMIT_EVENTS_QUEUE_URL as string,
+            })
           : new InMemoryEventBus(),
     },
   ],
