@@ -1682,3 +1682,42 @@ Hago un clon limpio del repositorio en otro directorio, con volúmenes de Docker
 La ruta B (servicios en el host) falla en el escenario del evento. Reviso los logs.
 
 Se confirma la causa: tu shell tiene `AWS_REGION=us-west-2` y `AWS_PROFILE`. Repito la prueba en el clon limpio con ese mismo entorno.
+
+Hice la prueba desde un clon limpio del repositorio y encontré un fallo real, que ya corregí. Después de la corrección, el clon pasa todo.
+
+**Qué probé, siguiendo el README tal cual**
+
+| Paso | Resultado |
+| --- | --- |
+| Clonar a otra carpeta, con volúmenes de Docker nuevos | OK |
+| `pnpm install`, `pnpm infra:up`, `pnpm dev:setup` | OK (llaves y `.env` generados) |
+| `pnpm apps:up` (migra y levanta ambos servicios) | OK, unos 95 s construyendo |
+| `pnpm demo` | OK |
+| `pnpm seed` y los ejemplos de `AGENTS.md` | Todo coincide con lo documentado: cupo 100000, 40000 disponibles tras comprar 60000, 145000 tras el depósito adicional, estado de cuenta tras avanzar 35 días |
+| `pnpm scenarios` en contenedores | 61/61 |
+| `pnpm check` en el clon | 132 pruebas OK en unos 30 s |
+| Opción B (servicios en el host con `pnpm dev:*`) | **Falló un escenario** |
+
+**Qué falló y por qué**
+Con los servicios en el host, el escenario del cambio de cupo por evento no pasaba. La causa fue tu shell, que tiene `AWS_REGION=us-west-2` y `AWS_PROFILE`. Eso pisaba la región `us-east-1` de LocalStack y SNS rechazaba el ARN del tópico. Dentro de contenedores no pasaba, porque no heredan tu entorno. Además, los errores del consumidor SQS no se registraban en ningún lado, así que el fallo era silencioso.
+
+**La corrección** (commit `4c877fe`)
+- Cuando `AWS_ENDPOINT_URL` está definido (LocalStack), los servicios siempre usan región `us-east-1` y credenciales de prueba, y ya no usan las `AWS_*` de tu shell. Eso también evita mandar credenciales reales a un emulador local.
+- El consumidor SQS ahora escribe sus errores en el log.
+- Hay pruebas nuevas para esa configuración, y el README documenta el comportamiento y cómo diagnosticarlo.
+
+Con tu mismo entorno (`AWS_REGION=us-west-2` y el perfil activos), la opción B ahora pasa 61/61. Los 21 eventos que se habían quedado atascados en el outbox se publicaron solos después de la corrección, sin intervención.
+
+**Estado en que lo dejé:** borré el clon de prueba y sus volúmenes. Tu stack original (`lending-service`) está de vuelta con Postgres, Redis y LocalStack arriba, pero los servicios de la aplicación están detenidos. Tienes todo commiteado en `feat/monorepo` (último commit `247e26b`), sin empujar.
+
+La prueba asumió que Docker, Node 22 y corepack ya estaban instalados. Si alguien no tiene `jq` o `uuidgen`, los ejemplos con `curl` de `AGENTS.md` necesitan alternativas, pero `pnpm seed` y `pnpm scenarios` no dependen de ellos.
+
+## Turn 47
+
+### Prompt
+
+mergea a main, haz commit y luego regenera el archivo prompts.md
+
+### Response
+
+_(tool work only)_
