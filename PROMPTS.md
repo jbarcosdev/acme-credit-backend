@@ -1659,3 +1659,26 @@ corrige el cupo de la tarjeta para que sea 1000 usd
 Interpreto que te refieres a la tarjeta de prueba del seed (hoy da 900 USD porque el depósito de 1000 USD se convierte en cupo al 90 %). Hago que el seed calcule el depósito necesario para que el cupo sea exactamente 1000 USD (100000 centavos), sin tocar el ratio del producto.
 
 Verifico con el stack real que el seed da exactamente 1000.00 USD.
+
+La tarjeta de prueba del seed ahora tiene un cupo de exactamente 1000.00 USD. Lo probé contra el stack real: depósito de 111112, cupo 100000, disponible 100000 y estado `ACTIVE`. Correr el seed dos veces devuelve las mismas cuentas. Está commiteado (`16af402`, sin empujar).
+
+- **Qué cambió:** el seed ahora recibe el cupo que quieres (`--cupo`, por defecto 100000 centavos) y calcula el depósito necesario con el ratio de colateral. Con el ratio de 90 % hacen falta 111112 de depósito para llegar a 100000 de cupo. `--amount` sigue disponible si prefieres fijar el depósito exacto.
+- **Ratio sin tocar:** el ratio de 90 % del producto sigue igual, para dejar margen a intereses y cargos.
+- **Claves de idempotencia:** las claves del seed ahora incluyen el monto, así que cada combinación de usuario y depósito es idempotente por separado. Un `test-user` que ya tuviera una tarjeta de una ejecución anterior no queda bloqueado, pero conserva esa tarjeta vieja además de la nueva.
+- **Docs:** actualicé `AGENTS.md` con los nuevos valores: 100000 de cupo, 40000 disponibles tras una compra de 60000, y 145000 tras un depósito adicional de 50000. Los escenarios de `pnpm scenarios` y la demo crean sus propios clientes y no se vieron afectados.
+
+Interpreté "la tarjeta" como la del seed de pruebas. Si querías que cualquier depósito de 1000 USD dé 1000 USD de cupo, eso implica un ratio de 100 %: cambiaría el valor por defecto de `COLLATERAL_RATIO_BPS` y ajustaría las pruebas, los escenarios y los docs. Dime si es eso.
+
+## Turn 46
+
+### Prompt
+
+probemos que funcione, corre la prueba como si fueras otro dev testeando el repo por primera vez
+
+### Response
+
+Hago un clon limpio del repositorio en otro directorio, con volúmenes de Docker nuevos, y sigo el README paso a paso como lo haría alguien que lo ve por primera vez. Primero libero los puertos deteniendo (sin borrar datos) el stack actual.
+
+La ruta B (servicios en el host) falla en el escenario del evento. Reviso los logs.
+
+Se confirma la causa: tu shell tiene `AWS_REGION=us-west-2` y `AWS_PROFILE`. Repito la prueba en el clon limpio con ese mismo entorno.
