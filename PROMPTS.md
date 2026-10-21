@@ -1624,3 +1624,38 @@ Ahora los scripts: un módulo común, el seed idempotente y el runner de escenar
 La protección funcionó: el contenedor corre con `NODE_ENV=production` y se negó a arrancar con el reloj de desarrollo. Para el stack local de compose, lending corre en modo desarrollo.
 
 Los 12 escenarios pasan contra el stack real (61 verificaciones). Compruebo que se pueden repetir (el reloj ya avanzó) y que el seed es idempotente.
+
+Sí, hacía falta, y agregué más que el documento. Está commiteado (`a39e563`, rama `feat/monorepo`, sin empujar).
+
+**Lo que quedó**
+- **[AGENTS.md](AGENTS.md):** guía en español para levantar el sistema y probarlo sin leer el código. Cubre:
+  - el stack y cómo saber que está listo;
+  - cómo usar el seed y sus tokens;
+  - cada caso de uso con su petición y el resultado esperado (HTTP y campos): compras aprobadas y rechazadas, idempotencia, pagos, reversos, cuotas diferidas, depósito adicional, reducción de cupo, cierre y casos de seguridad;
+  - cómo simular el paso del tiempo para intereses, mora y cierre por impago;
+  - una tabla de códigos de error, consultas SQL, Redis y LocalStack para inspeccionar el estado, y qué reportar si algo falla.
+- **`pnpm seed`:** crea un cliente `test-user` con cuenta de custodia, depósito de 100000 confirmado y tarjeta activa (cupo 90000). Es idempotente, probado ejecutándolo dos veces con los mismos ids. Imprime ids y tokens (cliente, red de tarjetas y scheduler). Acepta `--user`, `--amount`, `--cycle-day` y `--ttl`.
+- **`pnpm scenarios`:** ejecuta 12 escenarios (61 verificaciones) contra los servicios levantados. Cada uno usa su propio cliente. El código de salida indica el resultado: `0` todo bien, `1` algo falla, `2` servicios apagados. Corrió completo dos veces seguidas en el stack de contenedores y también acepta `--only=1,2`.
+- **Reloj de desarrollo:** sin esto no se podía probar la facturación sin esperar meses.
+  - lending expone `POST /internal/dev/clock` para avanzar el tiempo, que combinado con `POST /internal/jobs/daily` permite probar estados de cuenta, intereses, cuota diferida, mora, recuperación y cierre por impago.
+  - Solo avanza hacia adelante y requiere `DEV_CLOCK=true`. El servicio se niega a arrancar así con `NODE_ENV=production`: el contenedor lo rechazó cuando me olvidé de ajustarlo en compose.
+  - Cada ejecución de `pnpm scenarios` adelanta ese reloj unos 55 días. Para volver a la hora real hay que recrear el stack con `docker compose --profile apps down -v`.
+
+**Una cosa que arreglé en el camino**
+La primera versión del seed no era realmente idempotente, porque el webhook llevaba la hora actual en el cuerpo y la segunda ejecución cambiaba el contenido. Ahora usa una hora fija. En mi base local el usuario `test-user` quedó con datos de esa versión rota, así que ahí `pnpm seed` sin `--user` falla hasta recrear los volúmenes. En una base nueva no pasa.
+
+También actualicé el README con una sección para agentes, `pnpm check` pasa (132 pruebas automáticas) y regeneré `PROMPTS.md`.
+
+¿Empujo la rama y abro el PR?
+
+## Turn 45
+
+### Prompt
+
+corrige el cupo de la tarjeta para que sea 1000 usd
+
+### Response
+
+Interpreto que te refieres a la tarjeta de prueba del seed (hoy da 900 USD porque el depósito de 1000 USD se convierte en cupo al 90 %). Hago que el seed calcule el depósito necesario para que el cupo sea exactamente 1000 USD (100000 centavos), sin tocar el ratio del producto.
+
+Verifico con el stack real que el seed da exactamente 1000.00 USD.

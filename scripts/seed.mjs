@@ -2,7 +2,9 @@ import { bankConfirm, call, parseArgs, tokens, urls, waitUntilReady } from './li
 
 const args = parseArgs();
 const userId = args.user ?? 'test-user';
-const amount = Number(args.amount ?? 100_000);
+const ratioBps = Number(process.env.COLLATERAL_RATIO_BPS ?? 9000);
+const cupo = Number(args.cupo ?? 100_000);
+const amount = Number(args.amount ?? Math.ceil((cupo * 10_000) / ratioBps));
 const cycleDay = Number(args['cycle-day'] ?? 15);
 const ttl = args.ttl ?? '12h';
 
@@ -17,22 +19,22 @@ const fail = (step, result) => {
   process.exit(1);
 };
 
-const custody = await call(urls.collateral, 'POST', '/custody-accounts', { auth: user, key: `seed:${userId}:custody`, body: {} });
+const custody = await call(urls.collateral, 'POST', '/custody-accounts', { auth: user, key: `seed:${userId}:${amount}:custody`, body: {} });
 if (custody.status !== 201) fail('abrir cuenta de custodia', custody);
 
 const deposit = await call(urls.collateral, 'POST', `/custody-accounts/${custody.body.id}/deposits`, {
   auth: user,
-  key: `seed:${userId}:deposit`,
+  key: `seed:${userId}:${amount}:deposit`,
   body: { bankId: 'sim-bank', amount },
 });
 if (deposit.status !== 201) fail('crear depósito', deposit);
 
-const confirmation = await bankConfirm({ reference: deposit.body.reference, amount, eventId: `seed:${userId}:event`, occurredAt: '2026-01-01T00:00:00.000Z' });
+const confirmation = await bankConfirm({ reference: deposit.body.reference, amount, eventId: `seed:${userId}:${amount}:event`, occurredAt: '2026-01-01T00:00:00.000Z' });
 if (confirmation.status !== 200) fail('confirmar depósito', confirmation);
 
 const card = await call(urls.lending, 'POST', '/cards', {
   auth: user,
-  key: `seed:${userId}:card`,
+  key: `seed:${userId}:${amount}:card`,
   body: { custodyAccountId: custody.body.id, cycleDay },
 });
 if (card.status !== 201) fail('solicitar tarjeta', card);

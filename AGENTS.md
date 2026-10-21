@@ -37,20 +37,20 @@ Para apagar: `pnpm apps:down`. Para empezar de cero (borra todos los datos): `do
 pnpm seed
 ```
 
-Crea, de forma idempotente, un cliente de prueba con cuenta de custodia, un depósito de 100000 confirmado por el banco simulado y una tarjeta activa. Se puede ejecutar cuantas veces se quiera: devuelve siempre los mismos identificadores. Imprime JSON:
+Crea, de forma idempotente, un cliente de prueba con cuenta de custodia, un depósito de 111112 (el mínimo que, al 90 %, da un cupo de 100000 centavos = 1000.00 USD) confirmado por el banco simulado y una tarjeta activa. Se puede ejecutar cuantas veces se quiera: devuelve siempre los mismos identificadores. Imprime JSON:
 
 | Campo | Contenido |
 | --- | --- |
 | `userId` | `test-user` (cambia con `--user=otro`) |
-| `custodyAccountId` | Cuenta de custodia con 100000 retenidos |
-| `cardAccountId` | Tarjeta ACTIVE con cupo 90000 y día de corte 15 |
+| `custodyAccountId` | Cuenta de custodia con 111112 retenidos |
+| `cardAccountId` | Tarjeta ACTIVE con cupo 100000 (1000.00 USD) y día de corte 15 |
 | `depositReference` | Referencia del depósito ya confirmado |
 | `account` | Estado inicial de la tarjeta |
 | `tokens.user` | JWT del cliente (dueño de las cuentas) |
 | `tokens.cardNetwork` | JWT de servicio con scope `authorizations:write` (la red de tarjetas) |
 | `tokens.scheduler` | JWT de servicio con scope `jobs:run` (jobs diarios y reloj de desarrollo) |
 
-Opciones: `--user=<id>`, `--amount=<centavos>`, `--cycle-day=1|15`, `--ttl=12h`. Los tokens duran 12 h por defecto.
+Opciones: `--user=<id>`, `--cupo=<centavos>` (cupo deseado; el depósito se calcula según el ratio), `--amount=<centavos>` (depósito exacto), `--cycle-day=1|15`, `--ttl=12h`. Los tokens duran 12 h por defecto.
 
 Para guardar los valores en variables de shell:
 
@@ -85,7 +85,7 @@ Los ejemplos usan las variables de la sección 2. Todas las peticiones con cuerp
 curl -s localhost:3000/accounts/$CARD -H "Authorization: Bearer $USER_TOKEN"
 ```
 
-Esperado (cuenta recién creada con el seed): `200`, `status: "ACTIVE"`, `balances.debt: 0`, `limit.cupo: 90000`, `availableCredit: 90000`.
+Esperado (cuenta recién creada con el seed): `200`, `status: "ACTIVE"`, `balances.debt: 0`, `limit.cupo: 100000`, `availableCredit: 100000`.
 
 ### 4.2 Compra aprobada y compra rechazada
 
@@ -98,9 +98,9 @@ curl -s -X POST localhost:3000/accounts/$CARD/authorizations -H "Authorization: 
 
 | Petición | Respuesta esperada |
 | --- | --- |
-| compra de `60000` con 90000 disponibles | `201`, `status: "APPROVED"`, `availableCredit: 30000`, `authorizationId` |
-| compra de `30001` con 30000 disponibles | `200`, `status: "DECLINED"`, `reason: "INSUFFICIENT_CREDIT"` |
-| compra de `30000` con 30000 disponibles | `201`, `APPROVED`, `availableCredit: 0` |
+| compra de `60000` con 100000 disponibles | `201`, `status: "APPROVED"`, `availableCredit: 40000`, `authorizationId` |
+| compra de `40001` con 40000 disponibles | `200`, `status: "DECLINED"`, `reason: "INSUFFICIENT_CREDIT"` |
+| compra de `40000` con 40000 disponibles | `201`, `APPROVED`, `availableCredit: 0` |
 
 Una compra rechazada **no** es un error HTTP: responde `200` con `DECLINED`. La deuda nunca supera el cupo.
 
@@ -154,7 +154,7 @@ pnpm bank:confirm -- --reference=$REF --amount=50000      # webhook firmado del 
 curl -s localhost:3000/accounts/$CARD -H "Authorization: Bearer $USER_TOKEN" | jq .limit.cupo
 ```
 
-Esperado: `bank:confirm` responde `200 {"status":"CONFIRMED"}`. En pocos segundos el cupo en lending pasa de `90000` a `135000` (150000 retenidos x 90 %) sin que lending consulte a collateral en esa petición: llega por el evento SNS/SQS. Para el banco con HMAC: `--bank=hmac-bank` y `"bankId":"hmac-bank"` al crear el depósito.
+Esperado: `bank:confirm` responde `200 {"status":"CONFIRMED"}`. En pocos segundos el cupo en lending pasa de `100000` a `145000` (161112 retenidos x 90 %) sin que lending consulte a collateral en esa petición: llega por el evento SNS/SQS. Para el banco con HMAC: `--bank=hmac-bank` y `"bankId":"hmac-bank"` al crear el depósito.
 
 ### 4.8 Reducción de cupo
 
