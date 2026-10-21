@@ -22,7 +22,10 @@
     "dev:setup": "node scripts/dev-setup.mjs",
     "token": "node scripts/mint-token.mjs",
     "bank:confirm": "node scripts/simulate-bank-webhook.mjs",
-    "jobs:daily": "node scripts/run-daily-jobs.mjs"
+    "jobs:daily": "node scripts/run-daily-jobs.mjs",
+    "demo": "node scripts/demo.mjs",
+    "apps:up": "docker compose --profile apps up -d --build",
+    "apps:down": "docker compose --profile apps down"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

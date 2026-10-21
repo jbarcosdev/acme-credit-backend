@@ -42,6 +42,55 @@ services:
       timeout: 5s
       retries: 20
 
+  collateral-migrate:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: migrate, args: { SERVICE: collateral } }
+    environment:
+      DATABASE_URL: postgresql://collateral:collateral@postgres:5432/collateral
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  lending-migrate:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: migrate, args: { SERVICE: lending } }
+    environment:
+      DATABASE_URL: postgresql://lending:lending@postgres:5432/lending
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  collateral:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: runtime, args: { SERVICE: collateral, PORT: '3001' } }
+    env_file: services/collateral/.env
+    environment:
+      PORT: '3001'
+      DATABASE_URL: postgresql://collateral:collateral@postgres:5432/collateral
+      AWS_ENDPOINT_URL: http://localstack:4566
+    ports:
+      - '3001:3001'
+    depends_on:
+      collateral-migrate: { condition: service_completed_successfully }
+      localstack: { condition: service_healthy }
+
+  lending:
+    profiles: [apps]
+    build: { context: ., dockerfile: docker/service.Dockerfile, target: runtime, args: { SERVICE: lending, PORT: '3000' } }
+    env_file: services/lending/.env
+    environment:
+      PORT: '3000'
+      DATABASE_URL: postgresql://lending:lending@postgres:5432/lending
+      REDIS_URL: redis://redis:6379
+      CUSTODY_URL: http://collateral:3001
+      AWS_ENDPOINT_URL: http://localstack:4566
+      LIMIT_EVENTS_QUEUE_URL: http://localstack:4566/000000000000/lending-limit-events
+    ports:
+      - '3000:3000'
+    depends_on:
+      lending-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      localstack: { condition: service_healthy }
+      collateral: { condition: service_healthy }
+
 volumes:
   postgres-data:
   redis-data:
