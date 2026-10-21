@@ -4,7 +4,7 @@ Servicio de lending para Acme Credit (tarjeta de crédito asegurada con colatera
 
 ## Fase actual
 
-Diseño, con el proyecto NestJS inicializado (sin lógica de dominio). Las decisiones se registran en `.claude/context/decisions.md` antes de implementar.
+Diseño cerrado en lo esencial (ver `docs/`), con el monorepo inicializado (sin lógica de dominio). Las decisiones se registran en `.claude/context/decisions.md` antes de implementar.
 
 ## Working rules
 
@@ -15,6 +15,8 @@ Diseño, con el proyecto NestJS inicializado (sin lógica de dominio). Las decis
 - Be concise. Do not overcomplicate designs.
 - Deliver only new or modified files with their exact destination path, never a zip.
 - Every architectural choice must record its trade-offs in `decisions.md` (the challenge evaluates the thinking process).
+- Commits: no `Co-Authored-By` trailer or any Claude/AI attribution in commit messages or PR descriptions. The only author is the user.
+- Commit as often as it makes sense during implementation.
 - Every AI prompt and response used in the build must be kept in `PROMPTS.md` (challenge requirement). Update it at the end of each working session.
 
 ## Invariantes del dominio (no negociables)
@@ -27,22 +29,30 @@ Diseño, con el proyecto NestJS inicializado (sin lógica de dominio). Las decis
 
 ## Stack (directivas del usuario)
 
-- NestJS 12, TypeScript, Node 22 (`.nvmrc`), yarn 4 con `nodeLinker: node-modules` (el CLI genera PnP por defecto; se descartó por fricción con Docker e IDE).
-- Arquitectura de microservicios, Docker, despliegue tentativo en ECS con Fargate.
+- Monorepo pnpm (10.x, versión fijada en `packageManager`) con NestJS 12, TypeScript, Node 22 (`.nvmrc`). Sin Turborepo ni Taskfile por ahora (YAGNI): `pnpm -r` ordena los builds por dependencias.
+- Microservicios, Docker, despliegue tentativo en ECS con Fargate. IaC con Terraform.
 - Seguir las prácticas estándar de NestJS (módulos, DI, DTOs con validación, config, tests).
-- Este servicio se desarrolla como repo independiente. Más adelante, al agregar la IaC, se evaluará un monorepo que lo integre.
-- Estructura: `src/modules/<subdominio>/` con un módulo Nest por subdominio, cada uno en su carpeta; código transversal en `src/shared/`. Imports ESM con extensión `.js`.
-- Base de datos: PostgreSQL en Docker para local (`docker-compose.yml`, variables en `.env.example`).
-- LocalStack para simular AWS en local (SQS, SNS, Secrets Manager, etc. según el diseño). Especificado, aún no configurado.
-- Tooling que trae el scaffold: vitest (unit y e2e), oxlint, prettier.
+- Prisma 7 con un esquema, migraciones y cliente generado por servicio (no global: cada servicio tiene su base de datos). El cliente se genera en `src/generated/prisma` (ignorado por git) durante el build.
+- PostgreSQL en Docker para local (dos bases, un usuario por base) y Redis. LocalStack (SNS, SQS) especificado, aún sin configurar.
+- Tooling: vitest (unit y e2e), oxlint, prettier. Imports ESM con extensión `.js`.
+- Sin comentarios en el código, salvo petición.
+
+## Estructura
+
+- `services/lending` y `services/collateral`: un módulo Nest por subdominio en `src/modules/<subdominio>/`; `src/shared/` para código transversal del servicio; `src/clients/` para clientes propios del servicio (custody y terms en lending, banks en collateral).
+- `lib/`: infraestructura técnica compartida, sin lógica de dominio. `contracts` (único acoplamiento deliberado entre servicios), `messaging`, `auth`, `cache`, `nest-common` (health).
+- `apps/`: aplicaciones web futuras. `terraform/`: IaC futura. `docs/`: diseño. `docker/`: scripts de inicio de contenedores.
 
 ## Commands
 
-- Instalar: `yarn install`
-- Build: `yarn build`
-- Dev: `yarn start:dev`
-- Tests: `yarn test`, `yarn test:e2e`, `yarn test:cov`
-- Lint: `yarn lint`
+- Instalar: `pnpm install`
+- Build (libs, luego `prisma generate` y `nest build` por servicio): `pnpm build`
+- Dev: `pnpm dev:lending`, `pnpm dev:collateral`
+- Tests: `pnpm test`, `pnpm test:e2e` (requieren `pnpm build` previo porque los servicios consumen las libs compiladas)
+- Lint y formato: `pnpm lint`, `pnpm format`
+- Todo junto: `pnpm check`
+- Infra local: `pnpm infra:up`, `pnpm infra:down`
+- Migraciones de un servicio: `pnpm --filter @acme/lending prisma:migrate` (requiere `DATABASE_URL`, ver `.env.example` del servicio)
 
 ## Arquitectura
 

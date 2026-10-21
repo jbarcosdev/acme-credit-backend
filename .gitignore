@@ -3,8 +3,7 @@ dist
 coverage
 .env
 .DS_Store
-.yarn/*
-!.yarn/releases
+*.tsbuildinfo
+services/*/src/generated
 .claude/settings.local.json
 .claude/CLAUDE.local.md
-*.tsbuildinfo

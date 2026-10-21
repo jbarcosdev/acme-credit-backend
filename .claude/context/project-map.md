@@ -1,25 +1,30 @@
 # Mapa del proyecto
 
-Estado: scaffold NestJS limpio, sin lógica de dominio.
+Estado: monorepo pnpm inicializado, sin lógica de dominio.
 
-- `src/app.module.ts`: importa los módulos de subdominio.
-- `src/modules/{collateral,cards,authorizations,repayments,ledger}/`: módulos vacíos, uno por subdominio.
-- `src/modules/health/`: `GET /health` (para el healthcheck de ECS).
-- `src/shared/`: código transversal (vacío).
-- `test/app.e2e-spec.ts`: e2e de `/health`.
-- `docker-compose.yml` y `.env.example`: PostgreSQL local. Actualizar este archivo cuando se cree la estructura real.
+```
+services/
+  lending/      accounts, billing, limits (src/modules), shared/, clients/, prisma/
+  collateral/   custody (src/modules), shared/, clients/, prisma/
+lib/
+  contracts/    sobre de eventos y tipos de la API entre servicios
+  messaging/    puertos de eventos, adaptadores SNS/SQS y en memoria
+  auth/         TokenVerifier, AccessPolicy, CurrentUser
+  cache/        puerto de caché, adaptadores Redis y en memoria
+  nest-common/  HealthModule (GET /health)
+apps/           vacío
+terraform/      vacío (README)
+docs/           domains.md, flows.md, security.md
+docker/postgres/init.sql   crea las bases lending y collateral con un usuario cada una
+docker-compose.yml         Postgres y Redis
+```
 
-## Estructura prevista (a confirmar en diseño)
+Las libs `contracts`, `messaging`, `auth` y `cache` son placeholders vacíos. Cada servicio tiene Prisma 7 configurado (`prisma.config.ts`, `prisma/schema.prisma` sin modelos) y `/health` con e2e.
 
-- `docs/`: arquitectura, decisiones (ADRs), modelo de datos, estrategia de concurrencia, seguridad, despliegue en cloud.
-- `src/`: servicio.
-- `tests/`: unitarios, integración, concurrencia, propiedades.
-- `infra/`: IaC y contenedores para correr en local.
-- `PROMPTS.md`: registro de prompts y respuestas de IA (requisito del reto).
-- `README.md`: cómo correr, resumen de arquitectura y proceso de pensamiento.
+## Pendiente de implementar
 
-## Cambios previstos al scaffold (tras aprobar el diseño)
-
-- `lending-service` (este repo): módulos `accounts`, `billing`, `limits`, `health`; `src/clients/{messaging,cache,custody,terms,auth}`; `src/shared` con idempotencia y auditoría. Se eliminan `collateral`, `cards`, `authorizations`, `repayments` y `ledger` como módulos.
-- `collateral-service` (repo nuevo): módulo `custody`, `health`; `src/clients/{messaging,banks}`; `src/shared` con outbox, idempotencia y auditoría.
-- `docker-compose.yml`: Postgres, Redis y LocalStack (SNS y SQS).
+- Puertos y adaptadores en `lib/` y `src/clients/` de cada servicio.
+- Modelos Prisma y migraciones (incluyendo `CHECK` y el trigger que hace inmutable el diario).
+- Outbox, idempotencia y auditoría en `src/shared/` (pensar si algo de esto va a `lib/nest-common`).
+- LocalStack en `docker-compose.yml`.
+- Dockerfiles por servicio (`pnpm deploy --filter`) y Terraform.

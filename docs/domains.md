@@ -79,7 +79,9 @@ Tasa de interés, cargo por mora, pago mínimo (porcentaje y piso), días a cier
 - No se construye un servicio falso.
 - Custodia usa el mismo puerto para el ratio.
 
-## Puertos y adaptadores (`src/clients/`)
+## Puertos y adaptadores
+
+Los que son comunes a ambos servicios viven en `lib/` (`messaging`, `cache`, `auth`); los propios de un servicio, en su `src/clients/` (`custody` y `terms` en lending, `banks` en collateral).
 
 | Puerto | Adaptador hoy | Cambio futuro |
 | --- | --- | --- |

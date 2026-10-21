@@ -46,3 +46,8 @@ Respuesta: se documentó docs/security.md con TokenVerifier, AccessPolicy, owner
 
 Prompt: el banco puede firmar con llave privada y nosotros guardar la pública, o enviar un token; debe soportar múltiples bancos.
 Respuesta: firma asimétrica preferida y HMAC como alternativa, referencia impredecible por depósito, puerto BankAdapter con registro por bankId; docs de seguridad y dominios actualizados.
+
+## Sesión 1: monorepo
+
+Prompt: separar en dos servicios con el mismo scaffold de módulos, monorepo inspirado en zlp (services, apps, terraform, lib), Prisma, pnpm.
+Respuesta: se creó la rama feat/monorepo con services/lending y services/collateral, libs placeholder, Prisma 7 por servicio, Postgres con dos bases y Redis en compose; build, lint y e2e verificados.

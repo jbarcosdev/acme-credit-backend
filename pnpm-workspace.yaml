@@ -1,0 +1,7 @@
+packages:
+  - services/*
+  - lib/*
+  - apps/*
+onlyBuiltDependencies:
+  - "@prisma/engines"
+  - prisma

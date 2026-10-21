@@ -7,12 +7,15 @@ Registro cronológico. Cada entrada: contexto, opciones consideradas, decisión,
 - Stack: NestJS (TypeScript). Directiva del usuario.
 - Arquitectura: microservicios. Directiva del usuario; falta definir los límites de servicio y justificarlos.
 - Contenedores: Docker. Despliegue tentativo en ECS con Fargate por simplicidad operativa (sin gestionar nodos).
-- Repos: por ahora estructura de repos separados; el monorepo se evalúa al agregar la IaC.
-- Estructura interna: módulos Nest por subdominio en `src/modules/`. Subdominios del scaffold (provisionales, a validar en el diseño): collateral, cards, authorizations, repayments, ledger, health.
-- Base de datos: PostgreSQL en Docker (`docker-compose.yml`).
+- Repos: monorepo pnpm con `services/`, `lib/`, `apps/` y `terraform/` (referencia: zlp, tomando la estructura y omitiendo Taskfiles, helm, un solo Prisma global y scripts por servicio).
+- Turborepo y Taskfile: descartados por ahora (YAGNI). Se añade un Taskfile pequeño para Docker, Terraform y ECS cuando llegue la IaC.
+- Prisma por servicio y no global: cada servicio tiene su propia base de datos y un cliente global expondría los modelos de uno al otro.
+- `lib/` solo con infraestructura técnica compartida, sin dominio; `contracts` es el único acoplamiento deliberado.
+- Gestor de paquetes pnpm (dependencias estrictas, `pnpm deploy` para imágenes Docker).
+- Estructura interna de cada servicio: módulos Nest por subdominio en `src/modules/`.
+- Base de datos: PostgreSQL en Docker (`docker-compose.yml`), una instancia con una base y un usuario por servicio.
 - Simulación de AWS en local: LocalStack (especificado, configuración pendiente).
 - ORM: Prisma (esquema como fuente única, tipos generados, `bigint` nativo, migraciones SQL editables). Bloqueos de fila, `CHECK` y triggers del diario se escriben en SQL dentro de las migraciones y con `$queryRaw`. Se descartó TypeORM. Verificar temprano la configuración con ESM y Nest 12.
-- Package manager: yarn 4 con node-modules en vez de PnP, para compatibilidad con Docker e IDE.
 
 ## Pendientes de decidir
 
