@@ -25,7 +25,8 @@
     "jobs:daily": "node scripts/run-daily-jobs.mjs",
     "demo": "node scripts/demo.mjs",
     "apps:up": "docker compose --profile apps up -d --build",
-    "apps:down": "docker compose --profile apps down"
+    "apps:down": "docker compose --profile apps down",
+    "prompts:export": "node scripts/export-prompts.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

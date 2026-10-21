@@ -7,7 +7,7 @@ Existe un proveedor de identidad externo (por ejemplo Clerk u otro equivalente) 
 ## Autenticación
 
 - Un guard de Nest valida cada token: firma, `iss`, `aud` y `exp`. Pasada esa validación, las claims son de confianza.
-- Puerto `TokenVerifier` en `src/clients/auth`. Un solo adaptador, configurado por entorno con una llave pública fija o con una URL de JWKS.
+- Puerto `TokenVerifier` en `lib/auth`. Un solo adaptador, configurado por entorno con una llave pública fija o con una URL de JWKS.
 - En desarrollo, un script del repo mintea tokens con una llave local, de modo que el camino de verificación es el real.
 - Los JWT van firmados, no cifrados: los tokens llevan solo las claims necesarias y ningún dato personal sensible.
 
@@ -41,7 +41,7 @@ Existe un proveedor de identidad externo (por ejemplo Clerk u otro equivalente) 
 Los bancos avisan los depósitos con un webhook a `POST /webhooks/banks/:bankId` en custodia. Es el único endpoint expuesto a terceros y el más delicado, porque confirmar un depósito falso crearía cupo de la nada. Pueden existir varios bancos, cada uno con su propio esquema de verificación.
 
 - **Firma asimétrica (preferida):** el banco firma con su llave privada y custodia guarda solo su llave pública, identificada por `kid`. Puede haber varias llaves activas por banco para rotar sin cortes.
-- **HMAC (para bancos que solo soportan secreto compartido):** firma sobre el cuerpo crudo con marca de tiempo, comparada en tiempo constante. No se acepta un token fijo en un encabezado, porque no protege el cuerpo y se filtra en logs.
+- **HMAC (para bancos que solo soportan secreto compartido; diseñado, no implementado: solo existe el adaptador asimétrico del banco simulado):** firma sobre el cuerpo crudo con marca de tiempo, comparada en tiempo constante. No se acepta un token fijo en un encabezado, porque no protege el cuerpo y se filtra en logs.
 - **Marca de tiempo firmada** con tolerancia corta, para rechazar repeticiones.
 - **Referencia por depósito:** la genera custodia, impredecible, y el banco debe devolverla. Un atacante tendría que conocerla además de falsificar la firma.
 - **Idempotencia** por banco e id de evento.

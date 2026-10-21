@@ -52,7 +52,7 @@ Dueño del crédito: deuda, movimientos, estados de cuenta, intereses y mora. El
 
 | Módulo | Responsabilidad |
 | --- | --- |
-| accounts | Cuenta de la tarjeta, diario de movimientos (compras, reversos, pagos, intereses, cargos), autorización, pagos, cierre y reducción de cupo (con tope propio) |
+| accounts | Cuenta de la tarjeta (incluye el día de corte elegido), diario de movimientos (compras, reversos, pagos, intereses, cargos, aplicación de colateral), autorización, pagos, cierre con liquidación y reducción de cupo con tope propio |
 | billing | Perfil de facturación por cuenta (día de corte 1 o 15, ciclo vigente, versión de condiciones), estados de cuenta, cálculo de intereses, cargos por mora, detección de morosidad y cierre por impago |
 | limits | Puerto `LimitSource`, lectura y escritura del cupo en Redis, consulta a custodia ante falta de dato, consumidor de `custody.limit-changed`, política ante falla |
 | health | Healthcheck |
@@ -74,7 +74,7 @@ Reglas de dependencia:
 ## Condiciones del producto
 
 Tasa de interés, cargo por mora, pago mínimo (porcentaje y piso), días a cierre por impago, zona horaria, `cycleDays` y ratio colateral a cupo son condiciones del producto, cuyo dueño natural es un servicio externo de producto. Hoy se resuelven así:
-- Puerto `ProductTermsProvider` en `src/clients/terms` con `getTerms(productId, version)`.
+- Cada servicio define el puerto que necesita en su `src/clients/terms`: `LendingTermsProvider` (tasa, cargos, mínimo, mora, días de corte) y `CollateralTermsProvider` (ratio).
 - Adaptador estático con valores fijos en configuración. Cuando exista el servicio real se escribe el adaptador HTTP, envuelto con el puerto `Cache` (al ser versiones inmutables, se cachean sin invalidación).
 - No se construye un servicio falso.
 - Custodia usa el mismo puerto para el ratio.
@@ -88,7 +88,7 @@ Los que son comunes a ambos servicios viven en `lib/` (`messaging`, `cache`, `au
 | `EventPublisher` y `EventConsumer` (`messaging`) | SNS y SQS; en memoria para tests | Kafka, RabbitMQ |
 | `Cache` (`cache`) | Redis; en memoria para tests | Otro almacén clave-valor |
 | `CustodyClient` (`custody`) | HTTP | Otro origen de cupo |
-| `ProductTermsProvider` (`terms`) | Valores estáticos | Servicio externo de producto |
+| `LendingTermsProvider` y `CollateralTermsProvider` (`terms`) | Valores estáticos por entorno | Servicio externo de producto |
 | `BankAdapter` (`banks`, en custodia) | Banco simulado | Un adaptador por banco real |
 
 Reglas del contrato de mensajería:
@@ -99,10 +99,10 @@ Reglas del contrato de mensajería:
 
 ## Cupo y disponible
 
-- El cupo es un indicador que entrega `LimitSource`. Hoy sale de custodia (retenido por el ratio); mañana puede salir de una decisión de crédito.
+- El cupo es un indicador que entrega `LimitsService` (módulo `limits`). Hoy sale de custodia (retenido por el ratio); mañana puede salir de una decisión de crédito sin tocar `accounts` ni `billing`.
 - Disponible = `min(cupo, tope propio) - deuda`. La deuda suma capital, intereses y cargos. El tope propio solo existe mientras hay una reducción de cupo en curso y se guarda en la cuenta, en Postgres.
-- Redis guarda `{ cupo, version, expiresAt }` por cuenta. Solo se acepta escribir una versión mayor (compare-and-set atómico). Un dato ausente significa "consultar a custodia", nunca "cupo cero".
-- La clave de Redis vive `LIMIT_CACHE_TTL_SECONDS + LIMIT_STALE_MAX_AGE_SECONDS`. Pasado `expiresAt` el dato está vencido pero aún disponible como último valor conocido.
+- Redis guarda el cupo, su `version` (la de custodia) y `fetchedAt` por cuenta de custodia. La escritura es un compare-and-set atómico (script Lua) que rechaza versiones anteriores y acepta la misma para refrescar su vigencia. Un dato ausente significa "consultar a custodia", nunca "cupo cero".
+- La clave de Redis vive `LIMIT_CACHE_TTL_SECONDS + LIMIT_STALE_MAX_AGE_SECONDS`. Pasado el TTL el dato está vencido pero sigue disponible como último valor conocido para la política `use_stale`.
 
 ## Configuración del cupo (variables de entorno)
 

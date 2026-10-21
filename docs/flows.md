@@ -174,8 +174,10 @@ sequenceDiagram
     Col->>Col: baja el cupo, sube la versión, libera el colateral sobrante
     Col-->>L: cupo y versión nuevos
     L->>R: guarda si la versión es mayor
-    L->>DB: retira el tope propio
+    L->>DB: marca el tope como asentado (limit_cap_settled_at)
     L-->>C: cupo actualizado
 ```
 
-El tope propio se guarda en Postgres dentro de la misma transacción que valida la deuda, así ninguna compra puede superar el nuevo cupo mientras Redis aún tiene el anterior. Solo se retira después de escribir el valor nuevo en Redis. Si la llamada a custodia o la escritura fallan, el tope permanece y un job de reintento completa la operación con la misma clave idempotente.
+El tope propio se guarda en Postgres dentro de la misma transacción que valida la deuda, así ninguna compra puede superar el nuevo cupo mientras Redis aún tiene el anterior. Si la llamada a custodia falla, el tope permanece y un job de reintento completa la operación con la misma clave idempotente.
+
+El tope no se retira al terminar: se marca como asentado y se libera pasado un margen (`LIMIT_CAP_RELEASE_SECONDS`, 300 por defecto), de forma perezosa en la siguiente autorización o en el job diario. El margen cubre las autorizaciones en vuelo que ya leyeron el cupo anterior de Redis antes de la actualización; sin él, una de ellas podía aprobarse por encima del nuevo límite (hallazgo de un test de concurrencia).
