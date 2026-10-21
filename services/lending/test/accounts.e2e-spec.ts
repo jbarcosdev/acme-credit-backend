@@ -106,6 +106,12 @@ describe('lending accounts (e2e)', () => {
     expect(account.deferred).toBe(sum('DEFERRED'));
   }
 
+  describe('health', () => {
+    it('reports readiness when the database answers', async () => {
+      await http().get('/health/ready').expect(200, { status: 'ready' });
+    });
+  });
+
   describe('requesting a card', () => {
     it('creates an active card with a limit derived from the custody account', async () => {
       const res = await openCard();

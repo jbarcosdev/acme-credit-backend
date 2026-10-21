@@ -10,3 +10,4 @@ export * from './audit.js';
 export * from './outbox.js';
 export * from './common.module.js';
 export * from './idempotency-key.decorator.js';
+export * from './access-log.middleware.js';

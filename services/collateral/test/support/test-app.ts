@@ -42,7 +42,7 @@ export async function createTestApp(): Promise<TestContext> {
     .overrideProvider(EventPublisher)
     .useValue(bus)
     .compile();
-  const app = moduleRef.createNestApplication({ rawBody: true });
+  const app = moduleRef.createNestApplication({ rawBody: true, logger: false });
   await app.listen(0);
   return {
     app,

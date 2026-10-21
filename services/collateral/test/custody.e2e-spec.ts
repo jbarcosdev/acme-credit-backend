@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { SCOPES } from '@acme/contracts';
+import { OutboxPublisher, type SqlDb } from '@acme/nest-common';
 import {
   createTestApp,
   resetDatabase,
@@ -75,6 +76,12 @@ describe('collateral service (e2e)', () => {
     expect((await webhook(deposit.reference, amount)).status).toBe(200);
     return account;
   }
+
+  describe('health', () => {
+    it('reports readiness when the database answers', async () => {
+      await http().get('/health/ready').expect(200, { status: 'ready' });
+    });
+  });
 
   describe('authentication', () => {
     it('serves health without a token', async () => {
@@ -458,6 +465,58 @@ describe('collateral service (e2e)', () => {
       const res = await reduce(account.id, 90_000);
       expect(res.status).toBe(422);
       expect(res.body.code).toBe('NOT_A_REDUCTION');
+    });
+  });
+
+  describe('outbox', () => {
+    it('retries with backoff when the publisher fails and never loses the event', async () => {
+      const account = await openAccount();
+      const deposit = await createDeposit(account.id, 5_000);
+      expect((await webhook(deposit.reference, 5_000)).status).toBe(200);
+
+      const original = ctx.bus.publish.bind(ctx.bus);
+      ctx.bus.publish = async () => {
+        throw new Error('broker down');
+      };
+      expect(await ctx.outbox.drain()).toBe(0);
+      ctx.bus.publish = original;
+
+      const failed = await ctx.prisma.outboxEvent.findFirstOrThrow();
+      expect(failed.publishedAt).toBeNull();
+      expect(failed.attempts).toBe(1);
+      expect(failed.lastError).toContain('broker down');
+      expect(failed.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
+
+      expect(await ctx.outbox.drain()).toBe(0);
+      await ctx.prisma.$executeRawUnsafe(
+        "UPDATE outbox_events SET next_attempt_at = now() - interval '1 second'",
+      );
+      expect(await ctx.outbox.drain()).toBe(1);
+      expect(ctx.bus.published).toHaveLength(1);
+      expect(
+        (await ctx.prisma.outboxEvent.findFirstOrThrow()).publishedAt,
+      ).not.toBeNull();
+    });
+
+    it('publishes each event once when several publishers drain concurrently', async () => {
+      const account = await openAccount();
+      for (let i = 0; i < 5; i++) {
+        const deposit = await createDeposit(account.id, 1_000);
+        await webhook(deposit.reference, 1_000);
+      }
+      const others = [1, 2].map(
+        () =>
+          new OutboxPublisher(ctx.prisma as unknown as SqlDb, ctx.bus, {
+            intervalMs: 0,
+          }),
+      );
+      const drained = await Promise.all([
+        ctx.outbox.drain(),
+        ...others.map((o) => o.drain()),
+      ]);
+      expect(drained.reduce((a, b) => a + b, 0)).toBe(5);
+      expect(ctx.bus.published).toHaveLength(5);
+      expect(new Set(ctx.bus.published.map((e) => e.id)).size).toBe(5);
     });
   });
 
