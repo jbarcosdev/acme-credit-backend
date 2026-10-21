@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import { SQSClient } from '@aws-sdk/client-sqs';
 import { Redis } from 'ioredis';
 import { LocalServiceTokenProvider, ServiceTokenProvider } from '@acme/auth';
@@ -58,6 +58,10 @@ import {
         process.env.EVENT_BUS === 'sqs'
           ? new SqsEventConsumer(new SQSClient(awsConfigFromEnv()), {
               queueUrl: process.env.LIMIT_EVENTS_QUEUE_URL as string,
+              onError: (error) =>
+                new Logger('limit-events').error(
+                  error instanceof Error ? error.message : String(error),
+                ),
             })
           : new InMemoryEventBus(),
     },

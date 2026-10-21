@@ -134,7 +134,7 @@ Los servicios hablan con LocalStack porque `AWS_ENDPOINT_URL` apunta a él; sin 
 | `AUTH_ISSUER`, `AUTH_AUDIENCE` | Emisor y audiencia esperados en los JWT |
 | `AUTH_PUBLIC_KEY` o `AUTH_JWKS_URL` | Llave pública (PEM) o JWKS con que se verifican los JWT |
 | `EVENT_BUS` | `sns` (collateral), `sqs` (lending) o `memory` |
-| `AWS_ENDPOINT_URL`, `AWS_REGION` | Endpoint de LocalStack (omitirlo usa AWS real) y región |
+| `AWS_ENDPOINT_URL`, `AWS_REGION` | Endpoint de LocalStack (omitirlo usa AWS real y su cadena de credenciales). Con endpoint personalizado los servicios usan siempre región `us-east-1` y credenciales de prueba, ignorando las `AWS_*` de tu shell (cambia la región local con `LOCAL_AWS_REGION`). Sin endpoint se usa `AWS_REGION` |
 | `TEST_DATABASE_URL`, `SHADOW_DATABASE_URL` | Solo desarrollo: base para pruebas y base sombra de Prisma |
 
 ### lending
@@ -399,4 +399,5 @@ El diseño lo dirigí yo y se implementó con Claude Code: decidí la arquitectu
 - **Un cambio de `init.sql` no se aplica.** Esos scripts solo corren con el volumen vacío: `docker compose down -v` y vuelve a `pnpm infra:up`.
 - **Prisma dice `P3009` o que una migración falló en la base de pruebas.** Reinicia solo esa base: `docker compose exec postgres psql -U lending -d lending_test -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"` (igual con `collateral`).
 - **Las pruebas fallan con "Cannot find module" o tipos faltantes en las librerías.** Los servicios consumen las librerías compiladas: ejecuta `pnpm build` antes.
+- **El cupo no sube tras un depósito adicional con los servicios en tu máquina.** Revisa `outbox_events` en la base de collateral (`select attempts, last_error from outbox_events order by created_at desc limit 3`) y los logs de lending. Si usas credenciales o región de AWS en tu shell (`AWS_PROFILE`, `AWS_REGION`), con `AWS_ENDPOINT_URL` configurado se ignoran a propósito.
 - **`401` en todas las llamadas.** Los `.env` y los tokens tienen que salir de la misma ejecución de `pnpm dev:setup`; si regeneraste `.dev/`, reinicia los servicios.
