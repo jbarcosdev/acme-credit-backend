@@ -8,3 +8,104 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum CardAccountStatus {
+  ACTIVE
+  DELINQUENT
+  CLOSING
+  CLOSED
+}
+
+enum MovementType {
+  PURCHASE
+  REVERSAL
+  PAYMENT
+  INTEREST
+  LATE_FEE
+  COLLATERAL_APPLICATION
+}
+
+enum Bucket {
+  PRINCIPAL
+  DEFERRED
+  INTEREST
+  FEES
+}
+
+enum Direction {
+  DEBIT
+  CREDIT
+}
+
+model CardAccount {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId          String            @map("owner_id")
+  custodyAccountId String            @unique @map("custody_account_id") @db.Uuid
+  currency         String            @default("USD")
+  status           CardAccountStatus @default(ACTIVE)
+  principal        BigInt            @default(0)
+  deferred         BigInt            @default(0)
+  interest         BigInt            @default(0)
+  fees             BigInt            @default(0)
+  limitCap         BigInt?           @map("limit_cap")
+  cycleDay         Int               @map("cycle_day")
+  termsVersion     Int               @map("terms_version")
+  closureKey       String?           @map("closure_key")
+  closureReason    String?           @map("closure_reason")
+  closureDebt      BigInt?           @map("closure_debt")
+  closedAt         DateTime?         @map("closed_at") @db.Timestamptz()
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz()
+  movements        Movement[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("card_accounts")
+}
+
+model Movement {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId           String       @map("account_id") @db.Uuid
+  type                MovementType
+  bucket              Bucket
+  direction           Direction
+  amount              BigInt
+  bucketBalanceAfter  BigInt       @map("bucket_balance_after")
+  referenceMovementId String?      @map("reference_movement_id") @db.Uuid
+  statementId         String?      @map("statement_id") @db.Uuid
+  note                String?
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  account             CardAccount  @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@index([referenceMovementId])
+  @@map("movements")
+}
+
+model IdempotencyKey {
+  scope       String
+  ownerId     String   @map("owner_id")
+  key         String
+  requestHash String   @map("request_hash")
+  statusCode  Int?     @map("status_code")
+  response    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@id([scope, ownerId, key])
+  @@map("idempotency_keys")
+}
+
+model AuditLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId       String   @map("actor_id")
+  actorType     String   @map("actor_type")
+  action        String
+  entityType    String   @map("entity_type")
+  entityId      String   @map("entity_id")
+  correlationId String?  @map("correlation_id")
+  data          Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}

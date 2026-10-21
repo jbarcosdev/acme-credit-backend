@@ -193,9 +193,24 @@ importers:
 
   services/lending:
     dependencies:
+      '@acme/auth':
+        specifier: workspace:*
+        version: link:../../lib/auth
+      '@acme/cache':
+        specifier: workspace:*
+        version: link:../../lib/cache
+      '@acme/contracts':
+        specifier: workspace:*
+        version: link:../../lib/contracts
+      '@acme/messaging':
+        specifier: workspace:*
+        version: link:../../lib/messaging
       '@acme/nest-common':
         specifier: workspace:*
         version: link:../../lib/nest-common
+      '@aws-sdk/client-sqs':
+        specifier: ^3.1154.0
+        version: 3.1154.0
       '@nestjs/common':
         specifier: ^12.0.1
         version: 12.2.0(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -211,9 +226,21 @@ importers:
       '@prisma/client':
         specifier: 7.10.1
         version: 7.10.1(prisma@7.10.1(@types/node@24.19.2)(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.15.1
+        version: 0.15.1
       dotenv:
         specifier: ^17.0.0
         version: 17.4.2
+      ioredis:
+        specifier: ^6.0.0
+        version: 6.0.0
+      nestjs-cls:
+        specifier: ^7.0.1
+        version: 7.0.1(@nestjs/common@12.2.0(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       pg:
         specifier: ^8.13.0
         version: 8.23.1
@@ -242,6 +269,9 @@ importers:
       '@types/supertest':
         specifier: ^7.0.0
         version: 7.2.1
+      jose:
+        specifier: ^6.2.13
+        version: 6.2.13
       prisma:
         specifier: 7.10.1
         version: 7.10.1(@types/node@24.19.2)(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)

@@ -21,13 +21,13 @@ export class InMemoryCache extends Cache {
     return { version: stored.version, value: stored.value };
   }
 
-  async setIfNewer(
+  async setIfNotOlder(
     key: string,
     entry: VersionedEntry,
     ttlSeconds: number,
   ): Promise<boolean> {
     const current = await this.get(key);
-    if (current && current.version >= entry.version) return false;
+    if (current && current.version > entry.version) return false;
     this.store.set(key, {
       ...entry,
       expiresAt: this.now() + ttlSeconds * 1000,

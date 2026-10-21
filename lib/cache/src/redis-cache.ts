@@ -3,7 +3,7 @@ import { Cache, type VersionedEntry } from './cache.js';
 
 const SET_IF_NEWER = `
 local current = redis.call('HGET', KEYS[1], 'version')
-if current and tonumber(current) >= tonumber(ARGV[1]) then
+if current and tonumber(current) > tonumber(ARGV[1]) then
   return 0
 end
 redis.call('HSET', KEYS[1], 'version', ARGV[1], 'value', ARGV[2])
@@ -22,7 +22,7 @@ export class RedisCache extends Cache {
     return { version: Number(stored.version), value: stored.value };
   }
 
-  async setIfNewer(
+  async setIfNotOlder(
     key: string,
     entry: VersionedEntry,
     ttlSeconds: number,

@@ -5,7 +5,7 @@ export interface VersionedEntry {
 
 export abstract class Cache {
   abstract get(key: string): Promise<VersionedEntry | null>;
-  abstract setIfNewer(
+  abstract setIfNotOlder(
     key: string,
     entry: VersionedEntry,
     ttlSeconds: number,

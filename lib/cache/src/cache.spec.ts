@@ -12,21 +12,21 @@ function contract(
   }>,
 ) {
   describe(name, () => {
-    it('stores a value and ignores older or equal versions', async () => {
+    it('stores a value and ignores older versions and refreshes equal ones', async () => {
       const { cache, key, done } = await create();
-      expect(await cache.setIfNewer(key, { version: 2, value: 'a' }, 60)).toBe(
-        true,
-      );
-      expect(await cache.setIfNewer(key, { version: 1, value: 'b' }, 60)).toBe(
-        false,
-      );
-      expect(await cache.setIfNewer(key, { version: 2, value: 'c' }, 60)).toBe(
-        false,
-      );
-      expect(await cache.get(key)).toEqual({ version: 2, value: 'a' });
-      expect(await cache.setIfNewer(key, { version: 3, value: 'd' }, 60)).toBe(
-        true,
-      );
+      expect(
+        await cache.setIfNotOlder(key, { version: 2, value: 'a' }, 60),
+      ).toBe(true);
+      expect(
+        await cache.setIfNotOlder(key, { version: 1, value: 'b' }, 60),
+      ).toBe(false);
+      expect(
+        await cache.setIfNotOlder(key, { version: 2, value: 'c' }, 60),
+      ).toBe(true);
+      expect(await cache.get(key)).toEqual({ version: 2, value: 'c' });
+      expect(
+        await cache.setIfNotOlder(key, { version: 3, value: 'd' }, 60),
+      ).toBe(true);
       expect(await cache.get(key)).toEqual({ version: 3, value: 'd' });
       await cache.delete(key);
       expect(await cache.get(key)).toBeNull();
@@ -53,7 +53,7 @@ describe('InMemoryCache expiry', () => {
   it('drops entries after the ttl', async () => {
     let now = 1_000;
     const cache = new InMemoryCache(() => now);
-    await cache.setIfNewer('k', { version: 1, value: 'a' }, 10);
+    await cache.setIfNotOlder('k', { version: 1, value: 'a' }, 10);
     now += 9_000;
     expect(await cache.get('k')).not.toBeNull();
     now += 2_000;
