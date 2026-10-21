@@ -8,3 +8,7 @@ services/*/src/generated
 .claude/settings.local.json
 .claude/CLAUDE.local.md
 .dev
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars

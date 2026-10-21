@@ -18,7 +18,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:create": "prisma migrate dev --create-only",
     "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:migrate:status": "prisma migrate status"
+    "prisma:migrate:status": "prisma migrate status",
+    "jobs:daily": "node dist/cli/daily-jobs.js"
   },
   "dependencies": {
     "@acme/auth": "workspace:*",
