@@ -1516,3 +1516,40 @@ Ahora las compras diferidas. Empiezo por el esquema y la migración.
 Voy ajustando la capa de cuentas para diferidos (validación de cuotas, compra en el bucket diferido, reverso solo antes de facturar). Sigo con tipos, DTO y ledger.
 
 Funciona también en contenedores. Commiteo y actualizo `PROMPTS.md`.
+
+Ya están implementadas las compras diferidas y el adaptador HMAC para bancos. Quedaron en dos commits nuevos en `feat/monorepo`, sin empujar.
+
+`pnpm check` pasa completo (infra levantada). Los tests nuevos son 4 para HMAC, 12 e2e de diferidos y 5 unitarios de la matemática de cuotas, y se amplió la prueba de propiedades. También probé en contenedores con `pnpm demo`. La demo ahora incluye una compra a 3 cuotas.
+
+## HMAC
+Hay un nuevo adaptador `HmacBankAdapter` para bancos que solo soportan secreto compartido, registrado como `hmac-bank`:
+- Firma HMAC-SHA256 sobre `timestamp.cuerpo`, comparada en tiempo constante, con ventana de repetición y la misma idempotencia que el banco Ed25519.
+- Los dos adaptadores comparten el parseo del payload.
+- El registro de bancos se arma desde el entorno (`BANK_SIM_PUBLIC_KEY`, `BANK_HMAC_SECRET`), y `pnpm dev:setup` genera el secreto.
+- `pnpm bank:confirm -- --bank=hmac-bank ...` simula el webhook.
+
+## Compras diferidas
+- **Compra:** `POST .../authorizations` acepta `installments`. Las opciones (3, 6 o 12 meses, con tasa propia y monto mínimo) salen de las condiciones, y la compra va al bucket `DEFERRED`. El monto completo consume el cupo desde el primer día, pero no es pagable por adelantado y no genera interés revolvente.
+- **Facturación:** en el primer corte posterior a la compra se crea el plan con cuota fija tipo anualidad, en enteros. La última cuota absorbe el redondeo. En cada corte se factura una cuota: baja `DEFERRED`, sube `PRINCIPAL` y sube `INTEREST` con el interés de esa cuota. Desde ahí es deuda normal, así que cascada de pagos, mora y cierre por impago funcionan sin cambios.
+- **Pago mínimo:** nunca es menor que la cuota del ciclo, y si no se paga genera cargo por mora.
+- **Estado de cuenta:** incluye las líneas de cuotas, las compras diferidas del período y el saldo diferido.
+- **Reverso:** de una compra diferida solo es posible antes de que exista el plan. Después responde 422.
+- **Cierre:** acelera el plan. El saldo diferido entra en la deuda que cubre el colateral y no se cobran intereses futuros.
+- **Consulta:** `GET /accounts/:id/installment-plans`.
+
+## Cosas que debes saber
+- Dos errores míos al editar la base de datos de pruebas: una migración rota quedó a medias en `lending_test`, y tuve que resetear su esquema. Ya está corregido y el `docker compose down -v` la recrea limpia.
+- Como el estado de cuenta ahora separa las compras diferidas, cambié su identidad contable (`CHECK` en la base) para incluir capital e interés de cuotas.
+- Los docs (README, `docs/decisions.md` con el ADR 15, `docs/flows.md` con el flujo 8) están actualizados, y `PROMPTS.md` se regeneró hasta antes de este mensaje final.
+
+Lo siguiente sería abrir el PR con la rama (`gh` no está instalado, tendría que ser por el enlace de GitHub), o dejar el repositorio listo para entregar. ¿Qué prefieres?
+
+## Turn 41
+
+### Prompt
+
+de acuerdo, todos los tests pasan, por favor, actualiza el readme con todos los detalles de cómo funciona, cómo levantar el servicio en local stack, etc, en español y haz commit
+
+### Response
+
+Antes de reescribir el README verifico que la ruta "servicios en el host + LocalStack" realmente funciona tal como la voy a documentar.

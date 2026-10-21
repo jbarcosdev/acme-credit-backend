@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { ConsoleLogger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
