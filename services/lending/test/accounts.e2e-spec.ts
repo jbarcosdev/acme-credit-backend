@@ -23,6 +23,7 @@ describe('lending accounts (e2e)', () => {
 
   beforeEach(async () => {
     await resetDatabase(ctx.prisma);
+    ctx.clock.set(new Date('2026-01-10T12:00:00Z'));
     await ctx.cache.delete(`limit:${CUSTODY_ID}`);
     ctx.custody.accounts.clear();
     ctx.custody.down = false;

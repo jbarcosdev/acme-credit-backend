@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AccessPolicy, type CurrentUserInfo } from '@acme/auth';
 import {
   AuditService,
+  Clock,
   ConflictError,
   fromMinor,
   IdempotencyService,
@@ -36,6 +37,7 @@ import type {
   RequestCardDto,
 } from './dto/accounts.dto.js';
 import { LedgerService } from './ledger.service.js';
+import { PaymentHooks } from './payment-hooks.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -75,6 +77,8 @@ export class AccountsService {
     private readonly limits: LimitsService,
     private readonly custody: CustodyClient,
     private readonly terms: LendingTermsProvider,
+    private readonly hooks: PaymentHooks,
+    private readonly clock: Clock,
   ) {}
 
   async requestCard(
@@ -137,6 +141,7 @@ export class AccountsService {
             currency: limit.currency,
             cycleDay: dto.cycleDay,
             termsVersion: terms.version,
+            createdAt: this.clock.now(),
           },
         });
         await this.audit.record(tx, {
@@ -210,7 +215,10 @@ export class AccountsService {
       key,
       dto,
       async (tx) => {
-        const row = await this.ledger.lock(tx, accountId);
+        const row = await this.ledger.releaseExpiredCap(
+          tx,
+          await this.ledger.lock(tx, accountId),
+        );
         const amount = BigInt(dto.amount);
         const available = availableCredit(cupo, row.limit_cap, debtOf(row));
 
@@ -350,6 +358,7 @@ export class AccountsService {
         remaining -= part;
         applied.push({ bucket, amount: fromMinor(part) });
       }
+      await this.hooks.run(tx, current);
       await this.audit.record(tx, {
         action: 'payment.applied',
         entityType: 'card_account',
@@ -363,13 +372,10 @@ export class AccountsService {
     });
   }
 
-  private async findOwned(
-    user: CurrentUserInfo,
-    id: string,
-  ): Promise<AccountRow> {
+  async findOwned(user: CurrentUserInfo, id: string): Promise<AccountRow> {
     const rows = await this.prisma.$queryRaw<AccountRow[]>`
       SELECT id, owner_id, custody_account_id, currency, status, principal, deferred, interest, fees,
-             limit_cap, cycle_day, terms_version
+             limit_cap, limit_cap_settled_at, cycle_day, terms_version
       FROM card_accounts WHERE id = ${id}::uuid`;
     const row = rows[0];
     if (!row) throw new NotFoundError('ACCOUNT_NOT_FOUND', 'Account not found');

@@ -25,6 +25,7 @@ describe('closure and limit reduction (e2e)', () => {
 
   beforeEach(async () => {
     await resetDatabase(ctx.prisma);
+    ctx.clock.set(new Date('2026-01-10T12:00:00Z'));
     await ctx.cache.delete(`limit:${CUSTODY_ID}`);
     ctx.custody.accounts.clear();
     ctx.custody.settlements.length = 0;
@@ -201,7 +202,7 @@ describe('closure and limit reduction (e2e)', () => {
   });
 
   describe('limit reduction', () => {
-    it('lowers the limit, releases collateral and clears the cap', async () => {
+    it('lowers the limit, releases collateral and drops the cap after the safety margin', async () => {
       const { id } = await card();
       await authorize(id, 30_000);
       const res = await reduce(id, 45_000);
@@ -211,13 +212,42 @@ describe('closure and limit reduction (e2e)', () => {
       const account = await ctx.prisma.cardAccount.findUniqueOrThrow({
         where: { id },
       });
-      expect(account.limitCap).toBeNull();
+      expect(account.limitCap).toBe(45_000n);
+      expect(account.limitCapSettledAt).not.toBeNull();
       const view = await http()
         .get(`/accounts/${id}`)
         .set('Authorization', `Bearer ${await userToken('user-1')}`);
       expect(view.body.limit.cupo).toBe(45_000);
       expect(view.body.availableCredit).toBe(15_000);
       expect((await authorize(id, 15_001)).body.status).toBe('DECLINED');
+
+      ctx.clock.advanceDays(1);
+      expect(
+        await ctx.app.get(LimitReductionService).releaseSettledCaps(),
+      ).toBe(1);
+      expect(
+        (await ctx.prisma.cardAccount.findUniqueOrThrow({ where: { id } }))
+          .limitCap,
+      ).toBeNull();
+      expect((await authorize(id, 15_001)).body.status).toBe('DECLINED');
+      expect((await authorize(id, 15_000)).body.status).toBe('APPROVED');
+    });
+
+    it('lets a later authorization release the cap once the margin has passed', async () => {
+      const { id } = await card();
+      await reduce(id, 20_000);
+      expect((await authorize(id, 1_000)).body.status).toBe('APPROVED');
+      expect(
+        (await ctx.prisma.cardAccount.findUniqueOrThrow({ where: { id } }))
+          .limitCap,
+      ).toBe(20_000n);
+      ctx.clock.set(new Date(ctx.clock.now().getTime() + 301_000));
+      expect((await authorize(id, 1_000)).body.status).toBe('APPROVED');
+      expect(
+        (await ctx.prisma.cardAccount.findUniqueOrThrow({ where: { id } }))
+          .limitCap,
+      ).toBeNull();
+      expect((await reduce(id, 10_000)).status).toBe(200);
     });
 
     it('rejects a limit lower than the debt and leaves nothing behind', async () => {
@@ -244,10 +274,12 @@ describe('closure and limit reduction (e2e)', () => {
 
       ctx.custody.down = false;
       expect(await ctx.app.get(LimitReductionService).retryPending()).toBe(1);
-      expect(
-        (await ctx.prisma.cardAccount.findUniqueOrThrow({ where: { id } }))
-          .limitCap,
-      ).toBeNull();
+      const settled = await ctx.prisma.cardAccount.findUniqueOrThrow({
+        where: { id },
+      });
+      expect(settled.limitCap).toBe(20_000n);
+      expect(settled.limitCapSettledAt).not.toBeNull();
+      expect(await ctx.app.get(LimitReductionService).retryPending()).toBe(0);
       expect(ctx.custody.reductions).toHaveLength(1);
       expect((await authorize(id, 20_001)).body.status).toBe('DECLINED');
     });

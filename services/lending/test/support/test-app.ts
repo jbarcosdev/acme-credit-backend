@@ -66,7 +66,7 @@ export async function createTestApp(
 
 export async function resetDatabase(prisma: TestContext['prisma']) {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE movements, card_accounts, idempotency_keys, audit_log CASCADE',
+    'TRUNCATE movements, card_accounts, idempotency_keys, audit_log, billing_profiles, statements, statement_outcomes CASCADE',
   );
 }
 

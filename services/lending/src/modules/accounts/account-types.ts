@@ -20,6 +20,7 @@ export interface AccountRow {
   interest: bigint;
   fees: bigint;
   limit_cap: bigint | null;
+  limit_cap_settled_at: Date | null;
   cycle_day: number;
   terms_version: number;
 }
@@ -32,6 +33,7 @@ export interface MovementEntry {
   referenceMovementId?: string;
   statementId?: string;
   note?: string;
+  effectiveAt?: Date;
 }
 
 export function debtOf(

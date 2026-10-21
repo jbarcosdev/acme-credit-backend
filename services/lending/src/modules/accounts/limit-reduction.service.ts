@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AccessPolicy, type CurrentUserInfo } from '@acme/auth';
 import {
   AuditService,
+  Clock,
   ConflictError,
   fromMinor,
   IdempotencyService,
@@ -32,6 +33,7 @@ export class LimitReductionService {
     private readonly ledger: LedgerService,
     private readonly custody: CustodyClient,
     private readonly limits: LimitsService,
+    private readonly clock: Clock,
   ) {}
 
   async request(
@@ -50,7 +52,10 @@ export class LimitReductionService {
           request: { newCupo },
         },
         async () => {
-          const row = await this.ledger.lock(tx, accountId);
+          const row = await this.ledger.releaseExpiredCap(
+            tx,
+            await this.ledger.lock(tx, accountId),
+          );
           this.policy.assertCanAccessOwned(user, row.owner_id);
           if (row.status !== 'ACTIVE')
             throw new ConflictError(
@@ -92,7 +97,12 @@ export class LimitReductionService {
     const account = await this.prisma.cardAccount.findUnique({
       where: { id: accountId },
     });
-    if (!account || account.limitCap === null) return false;
+    if (
+      !account ||
+      account.limitCap === null ||
+      account.limitCapSettledAt !== null
+    )
+      return false;
     const cap = account.limitCap;
 
     let reduced;
@@ -123,7 +133,7 @@ export class LimitReductionService {
       if (row.limit_cap !== cap) return;
       await tx.cardAccount.update({
         where: { id: accountId },
-        data: { limitCap: null },
+        data: { limitCapSettledAt: this.clock.now() },
       });
       await this.audit.record(tx, {
         action: 'limit.reduction.applied',
@@ -135,9 +145,34 @@ export class LimitReductionService {
     return true;
   }
 
+  async releaseSettledCaps(): Promise<number> {
+    const settled = await this.prisma.cardAccount.findMany({
+      where: { limitCap: { not: null }, limitCapSettledAt: { not: null } },
+      select: { id: true },
+    });
+    let released = 0;
+    for (const { id } of settled) {
+      const done = await this.prisma.$transaction(async (tx) => {
+        const row = await this.ledger.lock(tx, id);
+        const after = await this.ledger.releaseExpiredCap(tx, row);
+        if (after.limit_cap === null && row.limit_cap !== null) {
+          await this.audit.record(tx, {
+            action: 'limit.cap.released',
+            entityType: 'card_account',
+            entityId: id,
+          });
+          return true;
+        }
+        return false;
+      });
+      if (done) released++;
+    }
+    return released;
+  }
+
   async retryPending(): Promise<number> {
     const pending = await this.prisma.cardAccount.findMany({
-      where: { limitCap: { not: null } },
+      where: { limitCap: { not: null }, limitCapSettledAt: null },
       select: { id: true },
     });
     let applied = 0;

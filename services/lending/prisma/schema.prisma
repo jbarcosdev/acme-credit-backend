@@ -38,25 +38,28 @@ enum Direction {
 }
 
 model CardAccount {
-  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId          String            @map("owner_id")
-  custodyAccountId String            @unique @map("custody_account_id") @db.Uuid
-  currency         String            @default("USD")
-  status           CardAccountStatus @default(ACTIVE)
-  principal        BigInt            @default(0)
-  deferred         BigInt            @default(0)
-  interest         BigInt            @default(0)
-  fees             BigInt            @default(0)
-  limitCap         BigInt?           @map("limit_cap")
-  cycleDay         Int               @map("cycle_day")
-  termsVersion     Int               @map("terms_version")
-  closureKey       String?           @map("closure_key")
-  closureReason    String?           @map("closure_reason")
-  closureDebt      BigInt?           @map("closure_debt")
-  closedAt         DateTime?         @map("closed_at") @db.Timestamptz()
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz()
-  movements        Movement[]
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId           String            @map("owner_id")
+  custodyAccountId  String            @unique @map("custody_account_id") @db.Uuid
+  currency          String            @default("USD")
+  status            CardAccountStatus @default(ACTIVE)
+  principal         BigInt            @default(0)
+  deferred          BigInt            @default(0)
+  interest          BigInt            @default(0)
+  fees              BigInt            @default(0)
+  limitCap          BigInt?           @map("limit_cap")
+  limitCapSettledAt DateTime?         @map("limit_cap_settled_at") @db.Timestamptz()
+  cycleDay          Int               @map("cycle_day")
+  termsVersion      Int               @map("terms_version")
+  closureKey        String?           @map("closure_key")
+  closureReason     String?           @map("closure_reason")
+  closureDebt       BigInt?           @map("closure_debt")
+  closedAt          DateTime?         @map("closed_at") @db.Timestamptz()
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz()
+  movements         Movement[]
+  profile           BillingProfile?
+  statements        Statement[]
 
   @@index([ownerId])
   @@index([status])
@@ -74,10 +77,11 @@ model Movement {
   referenceMovementId String?      @map("reference_movement_id") @db.Uuid
   statementId         String?      @map("statement_id") @db.Uuid
   note                String?
+  effectiveAt         DateTime     @default(now()) @map("effective_at") @db.Timestamptz()
   createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz()
   account             CardAccount  @relation(fields: [accountId], references: [id])
 
-  @@index([accountId, createdAt])
+  @@index([accountId, effectiveAt])
   @@index([referenceMovementId])
   @@map("movements")
 }
@@ -108,4 +112,53 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@map("audit_log")
+}
+
+model BillingProfile {
+  accountId       String      @id @map("account_id") @db.Uuid
+  nextCutDate     DateTime    @map("next_cut_date") @db.Date
+  lastCutDate     DateTime?   @map("last_cut_date") @db.Date
+  cycleNumber     Int         @default(0) @map("cycle_number")
+  delinquentSince DateTime?   @map("delinquent_since") @db.Date
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+  account         CardAccount @relation(fields: [accountId], references: [id])
+
+  @@index([nextCutDate])
+  @@map("billing_profiles")
+}
+
+model Statement {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId       String            @map("account_id") @db.Uuid
+  cycleNumber     Int               @map("cycle_number")
+  periodStart     DateTime          @map("period_start") @db.Date
+  periodEnd       DateTime          @map("period_end") @db.Date
+  dueDate         DateTime          @map("due_date") @db.Date
+  openingBalance  BigInt            @map("opening_balance")
+  purchases       BigInt
+  reversals       BigInt
+  payments        BigInt
+  interestCharged BigInt            @map("interest_charged")
+  feesCharged     BigInt            @map("fees_charged")
+  closingBalance  BigInt            @map("closing_balance")
+  minimumPayment  BigInt            @map("minimum_payment")
+  termsVersion    Int               @map("terms_version")
+  termsSnapshot   Json              @map("terms_snapshot")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  account         CardAccount       @relation(fields: [accountId], references: [id])
+  outcome         StatementOutcome?
+
+  @@unique([accountId, cycleNumber])
+  @@index([dueDate])
+  @@map("statements")
+}
+
+model StatementOutcome {
+  statementId String    @id @map("statement_id") @db.Uuid
+  outcome     String
+  decidedAt   DateTime  @default(now()) @map("decided_at") @db.Timestamptz()
+  statement   Statement @relation(fields: [statementId], references: [id])
+
+  @@map("statement_outcomes")
 }

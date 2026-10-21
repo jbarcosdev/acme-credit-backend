@@ -6,6 +6,7 @@ import { AccountsService } from './accounts.service.js';
 import { AuthorizationsController } from './authorizations.controller.js';
 import { ClosureService } from './closure.service.js';
 import { LimitReductionService } from './limit-reduction.service.js';
+import { PaymentHooks } from './payment-hooks.js';
 import { LedgerService } from './ledger.service.js';
 
 @Module({
@@ -14,6 +15,7 @@ import { LedgerService } from './ledger.service.js';
   providers: [
     AccountsService,
     LedgerService,
+    PaymentHooks,
     ClosureService,
     LimitReductionService,
     IdempotencyService,
@@ -22,6 +24,7 @@ import { LedgerService } from './ledger.service.js';
   exports: [
     AccountsService,
     LedgerService,
+    PaymentHooks,
     ClosureService,
     LimitReductionService,
   ],
